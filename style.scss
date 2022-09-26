@@ -1,0 +1,111 @@
+//style.scss
+
+/**
+ * @Author: rahaingomanana <laurent>
+ * @Date:   2019-10-19T23:54:21+02:00
+ * @Email:  laurent.rahaingomanana@estaca.eu
+ * @Filename: style.css
+// @Last modified by:   laurent
+// @Last modified time: 2021-05-18T09:28:36+02:00
+ */
+
+body, html {
+    width:100%;
+    height: 100%;
+    font-family: 'Amiko', sans-serif;
+    color: black;
+    scroll-behavior: smooth;
+}
+body {
+    // position: relative;
+    // line-height:1.5em;
+}
+
+* {
+    box-sizing: border-box;
+    list-style-type: none;
+    text-decoration: none;
+    margin:0;
+    padding:0;
+    color: black;
+}
+
+p {
+    border: solid red 5px;
+    overflow-wrap: break-word;
+}
+
+nav {
+    font-size: 3em;
+    font-family: 'Dancing Script', cursive;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    width: 100%;
+    margin-top: 1em;
+    margin-bottom: 1em;
+    border-top: solid black 2px;
+    border-bottom: solid black 2px;
+}
+nav h1 {
+    background-color: black;
+    color: white;
+    padding: 0.4em 2em 0.4em 2em;
+}
+.section {
+    border: solid red 5px;
+    height: 70%;
+}
+.section .img {
+    height: 80%;
+    border: solid green 4px;
+    display: flex;
+    flex-direction: row;
+    width: 60%;
+}
+
+.section .img img {
+    max-height: 100%;
+    max-width: 65%;
+}
+
+.section .img .description {
+    max-width: 35%;
+    border: solid yellow 4px;
+    table-layout: fixed;
+}
+
+
+footer {
+    padding-top: 3em;
+    display: flex;
+    flex-direction: column;
+    border-top: .2mm solid black;
+    margin-top: 25vw;
+    background-color: rgba(255, 255, 255, 0.3);
+    .social {
+        border: solid yellow 4px;
+    }
+}
+footer .socials {
+    height: 5em;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    padding-left: 9em;
+    padding-right: 9em;
+}
+footer .title {
+    text-align: center;
+    padding-bottom: 3em;
+}
+footer img {
+    height: 3.5em;
+}
+footer #bottom {
+    margin-top: 1em;
+    border-top: 3px solid black;
+    text-align: center;
+    padding-top: .8em;
+    padding-bottom: 1em;
+}
