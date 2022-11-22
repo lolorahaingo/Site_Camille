@@ -72,6 +72,21 @@ nav h1 {
   color: rgb(200, 200, 200);
 }
 
+@-webkit-keyframes slide_out {
+  to {
+    margin: 0;
+    border-radius: 0;
+    height: 80%;
+  }
+}
+
+@keyframes slide_out {
+  to {
+    margin: 0;
+    border-radius: 0;
+    height: 80%;
+  }
+}
 .out {
   display: flex;
   flex-direction: column;
@@ -85,17 +100,26 @@ nav h1 {
 .out .ref {
   margin-bottom: -3em;
   margin-left: -4.5em;
-  width: 280px;
-  height: 280px;
+  width: 27vw;
+  height: 27vw;
   border-radius: 50%;
   background-color: rgb(100, 100, 100);
   display: flex;
   flex-direction: column;
   justify-content: center;
+  font-size: 100%;
 }
 .out .ref * {
   transform: rotate(-30deg);
   color: rgb(200, 200, 200);
+}
+.out .ref:hover {
+  -webkit-animation: slide_out 1s forwards;
+          animation: slide_out 1s forwards;
+}
+.out .ref:hover * {
+  transform: rotate(0);
+  transition: 1s;
 }
 .out .title {
   margin-left: -3em;
@@ -106,17 +130,15 @@ nav h1 {
   color: black;
 }
 
-/* create animation that move ref class to the right when mouse is hover
-*/
 @media screen and (max-width: 800px) {
   nav {
     margin-bottom: 2.5em;
   }
   .section {
+    flex-direction: column;
+    justify-content: left;
     margin-bottom: 30%;
-  }
-  .section h2 {
-    font-size: 1.1em;
+    margin-left: 20%;
   }
   .section .img {
     width: 70%;
@@ -127,9 +149,29 @@ nav h1 {
   .section .img .description {
     display: none;
   }
+  .section .out {
+    width: 75%;
+    justify-content: center;
+    align-items: center;
+  }
+  .section .out .title {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+  }
+  .section .out .title h2 {
+    font-size: 1.1em;
+  }
   .section .out .ref {
-    width: 140px;
-    height: 140px;
+    margin: 0;
+    padding: 0.3em;
+    border-radius: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .section .out .ref * {
+    transform: rotate(0);
+    font-size: 1.3em;
   }
 }
 footer {
