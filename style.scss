@@ -12,13 +12,9 @@
 body, html {
     width:100%;
     height: 100%;
-    font-family: 'Amiko', sans-serif;
+    font-family: 'Ms Madi', serif;
     color: black;
     scroll-behavior: smooth;
-}
-body {
-    // position: relative;
-    // line-height:1.5em;
 }
 
 * {
@@ -31,50 +27,125 @@ body {
 }
 
 p {
-    border: solid red 5px;
+    // border: solid red 5px;
     overflow-wrap: break-word;
 }
 
 nav {
-    font-size: 3em;
-    font-family: 'Dancing Script', cursive;
+    font-size: 5vw;
+    font-family: 'Abril Fatface', cursive;
     display: flex;
     flex-direction: row;
     justify-content: space-around;
     width: 100%;
     margin-top: 1em;
-    margin-bottom: 1em;
+    margin-bottom: 1.7em;
     border-top: solid black 2px;
     border-bottom: solid black 2px;
+    h1 {
+        background-color: black;
+        color: white;
+        padding: 0 1em 0 1em;
+        margin-left: 1em;
+        margin-right: 1em;
+    }
 }
-nav h1 {
-    background-color: black;
-    color: white;
-    padding: 0.4em 2em 0.4em 2em;
-}
+
 .section {
-    border: solid red 5px;
-    height: 70%;
-}
-.section .img {
-    height: 80%;
-    border: solid green 4px;
+    // border: solid red 5px;
     display: flex;
     flex-direction: row;
-    width: 60%;
+    justify-content: left;
+    margin-bottom: 17%;
+    .img {
+        // border: solid green 4px;
+        display: flex;
+        flex-direction: row;
+        width: 70%;
+        // max-width: 80%;
+        img {
+            width: 50%;
+        }
+        .description {
+            text-align: justify;
+            font-size: 1.4em;
+            padding: .9em;
+            padding-top: 2em;
+            // border: solid yellow 4px;
+            background-color: black;
+            * {
+                color:rgb(200, 200, 200);
+            }
+        }
+    }
 }
 
-.section .img img {
-    max-height: 100%;
-    max-width: 65%;
+.out {
+    // border: solid pink 5px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-size: 1.5em;
+    div {
+        text-align: center;
+        vertical-align: middle;
+    }
+    .ref {
+        margin-bottom: -3em;
+        margin-left: -4.5em;
+        width: 280px;
+        height: 280px;
+        border-radius: 50%;
+        background-color: rgb(100, 100, 100);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        * {
+            transform: rotate(-30deg);
+            color: rgb(200, 200, 200);
+        }
+    }
+    .title {
+        margin-left: -3em;
+        margin-top: -1.2em;
+        padding: .5em;
+        border-radius: 10%;
+        background-color: rgb(200, 200, 200);
+        color: black;
+    }
 }
+/* create animation that move ref class to the right when mouse is hover
+*/
 
-.section .img .description {
-    max-width: 35%;
-    border: solid yellow 4px;
-    table-layout: fixed;
+
+
+
+@media screen and (max-width: 800px) {
+    nav {
+        margin-bottom: 2.5em;
+    }
+    .section {
+        margin-bottom: 30%;
+        h2 {
+            font-size: 1.1em;
+        }
+        .img {
+            width: 70%;
+            img {
+                width: 100%;
+            }
+            .description {
+                display: none;
+            }
+        }
+        .out {
+            .ref {
+                width: 140px;
+                height: 140px;
+            }
+        }
+    }
 }
-
 
 footer {
     padding-top: 3em;
@@ -84,28 +155,26 @@ footer {
     margin-top: 25vw;
     background-color: rgba(255, 255, 255, 0.3);
     .social {
-        border: solid yellow 4px;
+        // border: solid yellow 4px;
+        height: 5em;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-around;
+        padding-left: 9em;
+        padding-right: 9em;
     }
-}
-footer .socials {
-    height: 5em;
-    display: flex;
-    flex-direction: row;
-    justify-content: space-around;
-    padding-left: 9em;
-    padding-right: 9em;
-}
-footer .title {
-    text-align: center;
-    padding-bottom: 3em;
-}
-footer img {
-    height: 3.5em;
-}
-footer #bottom {
-    margin-top: 1em;
-    border-top: 3px solid black;
-    text-align: center;
-    padding-top: .8em;
-    padding-bottom: 1em;
+    .title {
+        text-align: center;
+        padding-bottom: 3em;
+    }
+    img {
+        height: 3.5em;
+    }
+    #bottom {
+        margin-top: 1em;
+        border-top: 3px solid black;
+        text-align: center;
+        padding-top: .8em;
+        padding-bottom: 1em;
+    }
 }
