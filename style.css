@@ -47,21 +47,6 @@ nav h1 {
   margin-right: 1em;
 }
 
-@-webkit-keyframes slide_out {
-  to {
-    margin: 0;
-    border-radius: 0;
-    height: 80%;
-  }
-}
-
-@keyframes slide_out {
-  to {
-    margin: 0;
-    border-radius: 0;
-    height: 80%;
-  }
-}
 .section {
   display: flex;
   flex-direction: row;
@@ -110,10 +95,19 @@ nav h1 {
   align-items: center;
   font-size: 100%;
 }
-.section .out .ref * {
+.section .out .ref h2 {
+  position: relative;
   transition: transform 1s;
+  transition: 0.5s;
   transform: rotate(-30deg);
   color: rgb(200, 200, 200);
+}
+.section .out .ref p {
+  position: absolute;
+  color: transparent;
+  text-align: justify;
+  align-content: space-around;
+  padding: 0.9em;
 }
 .section .out .title {
   margin-left: -3em;
@@ -123,15 +117,26 @@ nav h1 {
   background-color: rgb(200, 200, 200);
   color: black;
 }
-.section:hover .out .ref {
-  margin: 0;
-  border-radius: 0;
-  height: 80%;
-  transition: 1s;
-}
-.section:hover .out .ref * {
-  transform: rotate(0);
-  transition: 1s;
+@media screen and (min-width: 800px) {
+  .section:hover .out .ref {
+    margin: 0;
+    border-radius: 0;
+    height: 80%;
+    align-content: normal;
+  }
+  .section:hover .out .ref h2 {
+    transform: rotate(0);
+    position: absolute;
+  }
+  .section:hover .out .ref p {
+    display: flex;
+    color: rgb(200, 200, 200);
+    position: relative;
+    transition: 0.7s;
+  }
+  .section:hover .out .ref h2 {
+    color: transparent;
+  }
 }
 
 @media screen and (max-width: 800px) {
@@ -142,16 +147,21 @@ nav h1 {
     flex-direction: column;
     justify-content: left;
     align-items: center;
-    margin-bottom: 30%;
+    margin-bottom: 20%;
   }
   .section .img {
-    width: 75%;
+    z-index: 10;
+    width: 100%;
+    padding-left: 10%;
+    padding-right: 10%;
   }
   .section .img img {
     width: 100%;
   }
   .section .img .description {
     display: none;
+    padding: 0;
+    margin: 0;
   }
   .section .out {
     width: 65%;
@@ -182,6 +192,20 @@ nav h1 {
   .section .out .ref h2 {
     display: none;
   }
+  .section .out .ref .text_ref {
+    font-size: 1em;
+    color: transparent;
+    position: relative;
+    max-height: 0;
+    transition: 0.5s;
+    padding: 0;
+    padding-top: 1em;
+  }
+  .section .out .ref .text_ref.show {
+    max-height: 800px;
+    color: black;
+    transition: 0.5s;
+  }
   .section .out .ref .arrow-down {
     width: 6vmin;
     height: 6vmin;
@@ -189,6 +213,7 @@ nav h1 {
     left: 50%;
     top: 50%;
     transform: rotate(-45deg);
+    transition: 0.5s;
   }
   .section .out .ref .arrow-down::before {
     content: "";
@@ -216,20 +241,22 @@ nav h1 {
   }
 }
 footer {
+  width: 100%;
   padding-top: 3em;
   display: flex;
   flex-direction: column;
   border-top: 0.2mm solid black;
   margin-top: 25vw;
   background-color: rgba(255, 255, 255, 0.3);
+  z-index: 100;
 }
-footer .social {
-  height: 5em;
+footer .socials {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   justify-content: space-around;
-  padding-left: 9em;
-  padding-right: 9em;
+}
+footer .socials a {
+  padding-left: 1em;
 }
 footer .title {
   text-align: center;

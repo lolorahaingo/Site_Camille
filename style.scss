@@ -15,6 +15,7 @@ body, html {
     font-family: 'Ms Madi', serif;
     color: black;
     scroll-behavior: smooth;
+    // overflow: hidden;
 }
 
 * {
@@ -51,14 +52,6 @@ nav {
     }
 }
 
-@keyframes slide_out {
-    to {
-        margin: 0;
-        border-radius: 0;
-        height: 80%;
-    }
-}
-
 .section {
     // border: solid red 5px;
     display: flex;
@@ -70,7 +63,6 @@ nav {
         display: flex;
         flex-direction: row;
         width: 70%;
-        // max-width: 80%;
         img {
             width: 50%;
         }
@@ -109,10 +101,19 @@ nav {
             justify-content: center;
             align-items: center;
             font-size: 100%;
-            * {
+            h2 {
+                position: relative;
                 transition: transform 1s;
+                transition: .5s;
                 transform: rotate(-30deg);
                 color: rgb(200, 200, 200);
+            }
+            p {
+                position: absolute;
+                color: transparent;
+                text-align: justify;
+                align-content: space-around;
+                padding: .9em;
             }
         }
         .title {
@@ -124,16 +125,27 @@ nav {
             color: black;
         }
     }
-    &:hover .out .ref { 
-        // animation: slide_out 1s forwards;
-        margin: 0;
-        border-radius: 0;
-        height: 80%;
-        transition: 1s;
-        * {
-            transform: rotate(0);
-            transition: 1s;
-        } 
+    @media screen and (min-width: 800px) {
+        &:hover .out .ref { 
+            margin: 0;
+            border-radius: 0;
+            height: 80%;
+            align-content: normal;
+            h2 {
+                transform: rotate(0);
+                position: absolute;
+            }
+            p {
+                display: flex;
+                color: rgb(200, 200, 200);
+                position: relative;
+                transition: .7s;
+            }
+            h2 {
+                color: transparent;
+                // transition: .5s;
+            }
+        }
     }
 }
 
@@ -149,16 +161,19 @@ nav {
         flex-direction: column;
         justify-content: left;
         align-items: center;
-        margin-bottom: 30%;
-        // margin-left: 20%;
+        margin-bottom: 20%;
         .img {
-            width: 75%;
+            z-index: 10;
+            width: 100%;
+            padding-left: 10%;
+            padding-right: 10%;
             img {
                 width: 100%;
-                
             }
             .description {
                 display: none;
+                padding: 0;
+                margin: 0;
             }
         }
         .out {
@@ -188,6 +203,21 @@ nav {
                 h2 {
                     display: none;
                 }
+                .text_ref {
+                    font-size: 1em;
+                    color: transparent;
+                    position: relative;
+                    max-height: 0;
+                    transition: .5s;
+                    padding: 0;
+                    padding-top: 1em;
+                    &.show {
+                        max-height: 800px;
+                        color: black;
+                        transition: .5s;
+                    }
+
+                }
                 .arrow-down {
                     width: 6vmin;
                     height: 6vmin;
@@ -196,6 +226,7 @@ nav {
                     left: 50%;
                     top: 50%;
                     transform: rotate(-45deg);
+                    transition: .5s;
                     
                     &::before {
                         content: '';
@@ -230,20 +261,26 @@ nav {
 }
 
 footer {
+    width: 100%;
     padding-top: 3em;
     display: flex;
     flex-direction: column;
     border-top: .2mm solid black;
     margin-top: 25vw;
     background-color: rgba(255, 255, 255, 0.3);
-    .social {
-        // border: solid yellow 4px;
-        height: 5em;
+    z-index: 100;
+    .socials {
+        // border: solid green 10px;
+        // align-items: center;
+
         display: flex;
-        flex-direction: row;
+        flex-direction: column;
         justify-content: space-around;
-        padding-left: 9em;
-        padding-right: 9em;
+        // padding-left: 9em;
+        // padding-right: 9em;
+        a {
+            padding-left: 1em;
+        }
     }
     .title {
         text-align: center;
