@@ -57,7 +57,7 @@ nav {
     display: flex;
     flex-direction: row;
     justify-content: left;
-    margin-bottom: 17%;
+    // margin-bottom: 17%;
     .img {
         // border: solid green 4px;
         display: flex;
@@ -84,14 +84,15 @@ nav {
         flex-direction: column;
         justify-content: space-between;
         font-size: 1.5em;
+        z-index: 10;
         div {
             text-align: center;
             vertical-align: middle;
         }
         .ref {
             transition: 1s;
-            margin-bottom: -3em;
-            margin-left: -4.5em;
+            // margin-bottom: -3em;
+            // margin-left: -4.5em;
             width: 27vw;
             height: 27vw;
             border-radius: 50%;
@@ -117,10 +118,10 @@ nav {
             }
         }
         .title {
-            margin-left: -3em;
-            margin-top: -1.2em;
+            // margin-left: -3em;
+            // margin-top: -1.2em;
             padding: .5em;
-            border-radius: .4em;
+            // border-radius: .4em;
             background-color: rgb(200, 200, 200);
             color: black;
         }
@@ -260,40 +261,112 @@ nav {
     }
 }
 
-footer {
-    width: 100%;
-    padding-top: 3em;
-    display: flex;
-    flex-direction: column;
-    border-top: .2mm solid black;
-    margin-top: 25vw;
-    background-color: rgba(255, 255, 255, 0.3);
-    z-index: 100;
-    .socials {
-        // border: solid green 10px;
-        // align-items: center;
-
-        display: flex;
-        flex-direction: column;
-        justify-content: space-around;
-        // padding-left: 9em;
-        // padding-right: 9em;
-        a {
-            padding-left: 1em;
+// Styles spécifiques pour chaque section
+#s_1 {
+    justify-content: right;
+    .img {
+        order: 2; // Placer l'image en second
+        img {
+            order: 2;
         }
+        .description {
+            order: 1;
+        }
+        
+    }
+
+    .out {
+        order: 1; // Placer le contenu en premier
+        align-items: flex-end;
+    }
+    .ref {
+        // margin-left: 0;
+        // margin-right: -4.5em;
+        h2 {
+            transform: rotate(30deg);
+            position: relative;
+        }
+        
     }
     .title {
+        // margin-right: -3em;
+        // margin-left: 0;
+        padding: .5em;
+        position: relative;
+    }
+    @media screen and (min-width: 800px) {
+        &:hover .out .ref { 
+            margin: 0;
+            // border-radius: 0;
+            // height: 80%;
+            align-content: normal;
+            h2 {
+                transform: rotate(0);
+                position: absolute;
+            }
+            // p {
+            //     display: flex;
+            //     color: rgb(200, 200, 200);
+            //     position: relative;
+            //     transition: .7s;
+            // }
+            h2 {
+                position: absolute;
+            //     color: transparent;
+            //     // transition: .5s;
+            }
+        }
+    }
+}
+ 
+
+
+
+
+footer {
+    width: 100%;
+    padding: 3em 1em; // Ajustement du padding pour plus d'espacement
+    display: flex;
+    flex-direction: column;
+    align-items: center; // Centrage du contenu
+    border-top: 2px solid black; // Changement de l'épaisseur de la bordure
+    margin-top: 10vw;
+    background-color: rgba(255, 255, 255, 0.9); // Légère transparence pour le fond
+    z-index: 100;
+
+    .socials {
+        display: flex;
+        flex-direction: row; // Disposition des icônes sociales en ligne
+        justify-content: center; // Centrage des icônes
+        align-items: center; // Centrage vertical
+        margin-bottom: 1em; // Espacement entre les icônes et le texte
+
+        a {
+            padding: 0 1em; // Espacement entre les icônes
+            transition: transform 0.3s; // Animation lors du survol
+
+            &:hover {
+                transform: scale(1.1); // Agrandissement des icônes au survol
+            }
+
+            img {
+                height: 3.5em; // Hauteur constante pour les icônes
+            }
+        }
+    }
+
+    .title {
         text-align: center;
-        padding-bottom: 3em;
+        padding-bottom: 1em; // Espacement du bas
+        font-size: 1.2em; // Taille de police pour le titre
+        color: black; // Couleur du texte
     }
-    img {
-        height: 3.5em;
-    }
+
     #bottom {
         margin-top: 1em;
-        border-top: 3px solid black;
+        border-top: 2px solid black; // Changement de l'épaisseur de la bordure
         text-align: center;
-        padding-top: .8em;
-        padding-bottom: 1em;
+        padding: 0.5em 0; // Ajustement du padding
+        color: black; // Couleur du texte
     }
 }

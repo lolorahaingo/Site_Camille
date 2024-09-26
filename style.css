@@ -51,7 +51,6 @@ nav h1 {
   display: flex;
   flex-direction: row;
   justify-content: left;
-  margin-bottom: 17%;
 }
 .section .img {
   display: flex;
@@ -76,6 +75,7 @@ nav h1 {
   flex-direction: column;
   justify-content: space-between;
   font-size: 1.5em;
+  z-index: 10;
 }
 .section .out div {
   text-align: center;
@@ -83,8 +83,6 @@ nav h1 {
 }
 .section .out .ref {
   transition: 1s;
-  margin-bottom: -3em;
-  margin-left: -4.5em;
   width: 27vw;
   height: 27vw;
   border-radius: 50%;
@@ -110,10 +108,7 @@ nav h1 {
   padding: 0.9em;
 }
 .section .out .title {
-  margin-left: -3em;
-  margin-top: -1.2em;
   padding: 0.5em;
-  border-radius: 0.4em;
   background-color: rgb(200, 200, 200);
   color: black;
 }
@@ -240,35 +235,84 @@ nav h1 {
     transition: 0.2s ease;
   }
 }
+#s_1 {
+  justify-content: right;
+}
+#s_1 .img {
+  order: 2;
+}
+#s_1 .img img {
+  order: 2;
+}
+#s_1 .img .description {
+  order: 1;
+}
+#s_1 .out {
+  order: 1;
+  align-items: flex-end;
+}
+#s_1 .ref h2 {
+  transform: rotate(30deg);
+  position: relative;
+}
+#s_1 .title {
+  padding: 0.5em;
+  position: relative;
+}
+@media screen and (min-width: 800px) {
+  #s_1:hover .out .ref {
+    margin: 0;
+    align-content: normal;
+  }
+  #s_1:hover .out .ref h2 {
+    transform: rotate(0);
+    position: absolute;
+  }
+  #s_1:hover .out .ref h2 {
+    position: absolute;
+  }
+}
+
 footer {
   width: 100%;
-  padding-top: 3em;
+  padding: 3em 1em;
   display: flex;
   flex-direction: column;
-  border-top: 0.2mm solid black;
-  margin-top: 25vw;
-  background-color: rgba(255, 255, 255, 0.3);
+  align-items: center;
+  border-top: 2px solid black;
+  margin-top: 10vw;
+  background-color: rgba(255, 255, 255, 0.9);
   z-index: 100;
 }
 footer .socials {
   display: flex;
-  flex-direction: column;
-  justify-content: space-around;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 1em;
 }
 footer .socials a {
-  padding-left: 1em;
+  padding: 0 1em;
+  transition: transform 0.3s;
+}
+footer .socials a:hover {
+  transform: scale(1.1);
+}
+footer .socials a img {
+  height: 3.5em;
 }
 footer .title {
   text-align: center;
-  padding-bottom: 3em;
-}
-footer img {
-  height: 3.5em;
+  padding-bottom: 1em;
+  font-size: 1.2em;
+  color: black;
 }
 footer #bottom {
   margin-top: 1em;
-  border-top: 3px solid black;
+  border-top: 2px solid black;
   text-align: center;
-  padding-top: 0.8em;
-  padding-bottom: 1em;
-}/*# sourceMappingURL=style.css.map */
+  padding: 0.5em 0;
+  color: black;
+}
+
+/*# sourceMappingURL=style.css.map */
