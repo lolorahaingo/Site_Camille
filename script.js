@@ -4,6 +4,50 @@
 // var scroll = 0;
 // var tmp_scroll;
 // tmp_scroll = scroll;
+// Mobile menu toggle and hide-on-scroll
+let lastScroll = 0;
+const THRESHOLD = 5;
+
+document.addEventListener('DOMContentLoaded', () => {
+    const header = document.querySelector('.site-header');
+    const toggle = document.querySelector('.menu-toggle');
+    const mobileMenu = document.querySelector('.mobile-menu');
+
+    if (!header || !toggle || !mobileMenu) return;
+
+    toggle.addEventListener('click', (e) => {
+        const isOpen = header.classList.toggle('menu-open');
+        toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        mobileMenu.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+        // fallback: force inline display in case CSS selector specificity prevents showing
+        mobileMenu.style.display = isOpen ? 'flex' : 'none';
+    });
+
+    // Close menu when a mobile link is clicked
+    mobileMenu.querySelectorAll('a').forEach(a => {
+        a.addEventListener('click', () => {
+            header.classList.remove('menu-open');
+            toggle.setAttribute('aria-expanded', 'false');
+                mobileMenu.setAttribute('aria-hidden', 'true');
+                mobileMenu.style.display = 'none';
+        });
+    });
+
+    // Hide mobile menu on scroll
+    window.addEventListener('scroll', () => {
+        const scrollPos = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+        if (Math.abs(scrollPos - lastScroll) > THRESHOLD) {
+            if (header.classList.contains('menu-open')) {
+                header.classList.remove('menu-open');
+                toggle.setAttribute('aria-expanded', 'false');
+                mobileMenu.setAttribute('aria-hidden', 'true');
+                mobileMenu.style.display = 'none';
+            }
+            lastScroll = scrollPos;
+        }
+    }, { passive: true });
+});
+
 window.addEventListener("scroll", (event) => {
     scroll = this.scrollY;
     // console.log(scroll);
@@ -15,8 +59,6 @@ window.addEventListener("scroll", (event) => {
     //     document.querySelector("nav h1").style.backgroundColor = color;
     // }
 });
-
-//on load of page
 
 window.onload = function() {
     var out= document.querySelectorAll('.out'); 
