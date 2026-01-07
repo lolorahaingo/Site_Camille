@@ -209,9 +209,12 @@ p {
         /* Make description fill the height determined by the image */
         .description {
             justify-content: center; /* vertically center content to image height */
+            place-content: center;     
             text-align: justify;
             font-size: 1.2em;
             padding: .9em;
+            padding-left: 10%;
+            padding-right: 10%;
             background-color: black;
             * {
                 color: rgb(200, 200, 200);
@@ -376,7 +379,7 @@ footer {
     flex-direction: column;
     align-items: center; // Centrage du contenu
     border-top: 2px solid black; // Changement de l'épaisseur de la bordure
-    margin-top: 10vw;
+    // margin-top: 10vw;
     background-color: rgba(255, 255, 255, 0.9); // Légère transparence pour le fond
     z-index: 100;
 
