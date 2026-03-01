@@ -1,78 +1,92 @@
-// variable scroll is updated on updated everytime "scroll"
-// event is triggered
-
-// var scroll = 0;
-// var tmp_scroll;
-// tmp_scroll = scroll;
-// Mobile menu toggle and hide-on-scroll
-let lastScroll = 0;
-const THRESHOLD = 5;
+// script.js — Camille Larode — Site Vitrine
 
 document.addEventListener('DOMContentLoaded', () => {
+
+    // ── Mobile menu toggle ──
     const header = document.querySelector('.site-header');
     const toggle = document.querySelector('.menu-toggle');
     const mobileMenu = document.querySelector('.mobile-menu');
 
-    if (!header || !toggle || !mobileMenu) return;
-
-    toggle.addEventListener('click', (e) => {
-        const isOpen = header.classList.toggle('menu-open');
-        toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-        mobileMenu.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
-        // fallback: force inline display in case CSS selector specificity prevents showing
-        mobileMenu.style.display = isOpen ? 'flex' : 'none';
-    });
-
-    // Close menu when a mobile link is clicked
-    mobileMenu.querySelectorAll('a').forEach(a => {
-        a.addEventListener('click', () => {
-            header.classList.remove('menu-open');
-            toggle.setAttribute('aria-expanded', 'false');
-                mobileMenu.setAttribute('aria-hidden', 'true');
-                mobileMenu.style.display = 'none';
+    if (header && toggle && mobileMenu) {
+        toggle.addEventListener('click', () => {
+            const isOpen = header.classList.toggle('menu-open');
+            toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            mobileMenu.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+            mobileMenu.style.display = isOpen ? 'flex' : 'none';
         });
-    });
 
-    // Hide mobile menu on scroll
-    window.addEventListener('scroll', () => {
-        const scrollPos = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
-        if (Math.abs(scrollPos - lastScroll) > THRESHOLD) {
-            if (header.classList.contains('menu-open')) {
+        // Close menu on link click
+        mobileMenu.querySelectorAll('a').forEach(a => {
+            a.addEventListener('click', () => {
                 header.classList.remove('menu-open');
                 toggle.setAttribute('aria-expanded', 'false');
                 mobileMenu.setAttribute('aria-hidden', 'true');
                 mobileMenu.style.display = 'none';
-            }
-            lastScroll = scrollPos;
-        }
-    }, { passive: true });
-});
+            });
+        });
 
-window.addEventListener("scroll", (event) => {
-    scroll = this.scrollY;
-    // console.log(scroll);
-    // if (scroll > tmp_scroll+10 || scroll < tmp_scroll-10) {
-    //     //get a random color between rgb(100, 100, 100) and rgb(200, 200, 200)
-    //     var a = Math.floor(Math.random() * 100) + 20;
-    //     var color = "rgb(" + a + "," + a + "," + a + ")";
-    //     tmp_scroll = scroll;
-    //     document.querySelector("nav h1").style.backgroundColor = color;
-    // }
-});
-
-window.onload = function() {
-    var out= document.querySelectorAll('.out'); 
-    for(let i = 0; i < out.length; i++) {
-        out[i].onclick =  function(event) {    
-            if(event.target.parentNode.querySelector(".text_ref").classList[1] !== "show") {
-                event.target.parentNode.querySelector(".text_ref").classList.toggle("show");
-                event.target.parentNode.querySelector(".arrow-down").style.transform = "rotate(135deg)";
+        // Close menu on scroll
+        let lastScroll = 0;
+        window.addEventListener('scroll', () => {
+            const scrollPos = window.scrollY;
+            if (Math.abs(scrollPos - lastScroll) > 5) {
+                if (header.classList.contains('menu-open')) {
+                    header.classList.remove('menu-open');
+                    toggle.setAttribute('aria-expanded', 'false');
+                    mobileMenu.setAttribute('aria-hidden', 'true');
+                    mobileMenu.style.display = 'none';
+                }
+                lastScroll = scrollPos;
             }
-            else {
-                event.target.parentNode.querySelector(".text_ref").classList.toggle("show");
-                event.target.parentNode.querySelector(".arrow-down").style.transform = "rotate(-45deg)";
-            }
-            console.log(event.target.parentNode.querySelector(".text_ref").style);
-        }
+        }, { passive: true });
     }
-}
+
+    // ── Header shadow on scroll ──
+    if (header) {
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 10) {
+                header.classList.add('scrolled');
+            } else {
+                header.classList.remove('scrolled');
+            }
+        }, { passive: true });
+    }
+
+    // ── Scroll reveal animation ──
+    const revealElements = document.querySelectorAll('.reveal');
+
+    if (revealElements.length > 0 && 'IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, {
+            threshold: 0.15,
+            rootMargin: '0px 0px -40px 0px'
+        });
+
+        revealElements.forEach(el => observer.observe(el));
+    }
+
+    // ── Smooth scroll for anchor links ──
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', (e) => {
+            const targetId = anchor.getAttribute('href');
+            if (targetId === '#') return;
+            const target = document.querySelector(targetId);
+            if (target) {
+                e.preventDefault();
+                const headerHeight = header ? header.offsetHeight : 0;
+                const targetPosition = target.getBoundingClientRect().top + window.scrollY - headerHeight;
+                window.scrollTo({
+                    top: targetPosition,
+                    behavior: 'smooth'
+                });
+            }
+        });
+    });
+
+});

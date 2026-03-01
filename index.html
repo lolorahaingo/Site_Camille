@@ -1,143 +1,267 @@
 <!DOCTYPE html>
 <html lang="fr" dir="ltr">
 
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Site vitrine de Camille">
-	<link href="https://fonts.googleapis.com/css?family=Abril+Fatface" rel="stylesheet">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Camille Larode — Modéliste et Assistante R&D Cuir. Diplômée de l'Institut Français de la Mode, spécialisée en cuir et peau lainée chez Yves Salomon.">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 	<link rel="stylesheet" type="text/css" href="style.css">
-	<script src="script.js"></script>
-    <title>Camille Larode</title>
-  </head>
-  <body>
+	<script src="script.js" defer></script>
+	<title>Camille Larode — Modéliste & R&D Cuir</title>
+</head>
 
+<body>
+
+	<!-- HEADER -->
 	<header class="site-header">
 		<div class="header-inner">
-			<a class="logo" href="#s_0"><h1>Camille Larode</h1></a>
+			<a class="logo" href="#hero"><h1>Camille Larode</h1></a>
 			<nav class="main-nav">
-				<a href="./images/Portfolio_collection_2025.pdf">Portfolio</a>
+				<a href="#parcours">Parcours</a>
+				<a href="#formation">Formation</a>
+				<a href="./images/Portfolio_collection_2025.pdf" target="_blank">Portfolio</a>
 				<a href="./images/CV_CLARODE.pdf" download="CV_CLARODE.pdf">CV</a>
 				<a href="#contact">Contact</a>
 			</nav>
-			<button class="menu-toggle" aria-label="Ouvrir le menu" aria-expanded="false">☰</button>
+			<button class="menu-toggle" aria-label="Ouvrir le menu" aria-expanded="false">
+				<span class="bar"></span>
+				<span class="bar"></span>
+				<span class="bar"></span>
+			</button>
 			<div class="mobile-menu" aria-hidden="true">
-				<a href="./images/Portfolio_collection_2025.pdf">Portfolio</a>
+				<a href="#parcours">Parcours</a>
+				<a href="#formation">Formation</a>
+				<a href="./images/Portfolio_collection_2025.pdf" target="_blank">Portfolio</a>
 				<a href="./images/CV_CLARODE.pdf" download="CV_CLARODE.pdf">CV</a>
 				<a href="#contact">Contact</a>
 			</div>
 		</div>
 	</header>
 
-    <div id="s_0" class="section">
-		<div class="img">
-			<img src="./images/Camille4.jpeg" alt="photo des vêtements de Camille Larode">
-			<div class="description">
-				<p>Diplômée en modélisme de l'Institut Français de la Mode,
-					j'ai également acquis plus de trois ans d'expérience dans une maison 
-					de luxe française, au sein du service de recherche et développement
-					pour le cuir et la peau lainée. J'ai développé un sens 
-					aigu du détail, du savoir-faire artisanal et de l'innovation produit.
-				</p>
+	<!-- HERO -->
+	<section id="hero" class="hero">
+		<div class="hero-image">
+			<img src="./images/Camille4.jpeg" alt="Mannequins portant les créations de fin de Bachelor de Camille Larode">
+			<div class="hero-overlay"></div>
+		</div>
+		<div class="hero-content">
+			<p class="hero-subtitle">Modéliste & Assistante R&D Cuir</p>
+			<p class="hero-tagline">Curieuse, créative et passionnée par la conception</p>
+		</div>
+	</section>
+
+	<!-- A PROPOS -->
+	<section id="apropos" class="section-about reveal">
+		<div class="container">
+			<h2 class="section-title">À propos</h2>
+			<div class="about-content">
+				<div class="about-text">
+					<p>Diplômée du <strong>Bachelor Modéliste Concepteur</strong> de l'<strong>Institut Français de la Mode</strong>, j'ai acquis plus de trois ans d'expérience au sein de la maison <strong>Yves Salomon</strong>, dans le service de recherche et développement pour le cuir et la peau lainée.</p>
+					<p>J'ai développé un sens aigu du détail, du savoir-faire artisanal et de l'innovation produit. Mon parcours, fait d'essais, de remises en question et d'apprentissage, m'a permis de cultiver une approche rigoureuse et créative de la conception de vêtements.</p>
+					<p>Aujourd'hui assistante R&D chez Yves Salomon, je continue d'évoluer dans un environnement qui me permet de grandir, de créer et de m'améliorer au quotidien.</p>
+				</div>
+				<div class="about-highlights">
+					<div class="highlight">
+						<span class="highlight-number">+3</span>
+						<span class="highlight-label">ans d'expérience<br>en maison de luxe</span>
+					</div>
+					<div class="highlight">
+						<span class="highlight-number">IFM</span>
+						<span class="highlight-label">Diplômée de l'Institut<br>Français de la Mode</span>
+					</div>
+				</div>
 			</div>
 		</div>
-		<div class="out">
-			<div class="title">
-				<h2>À propos de moi</h2>
-			</div>
-			<div class="ref">
-				<div class="arrow-down"></div>
-				<p class="text_ref">
-					Diplômée en modélisme de l'Institut Français de la Mode,
-					j'ai également acquis plus de trois ans d'expérience dans une maison 
-					de luxe française, au sein du service de recherche et développement
-					pour le cuir et la peau lainée. J'ai développé un sens 
-					aigu du détail, du savoir-faire artisanal et de l'innovation produit.		
-				</p>
-			</div>
-			<!-- <a href="./images/CV_Camille_LARODE_Luxe_Minimal_Vector-3.JPEG" download="CV_Camille_LARODE.JPEG">
-				<img src="./images/CV_Camille_LARODE_Luxe_Minimal_Vector-3.JPEG" alt="photo de Camille Larode">
-			</a> -->
-		</div>
+	</section>
 
-        
-	</div>
+	<!-- PARCOURS / EXPERIENCE -->
+	<section id="parcours" class="section-experience reveal">
+		<div class="container">
+			<h2 class="section-title">Parcours professionnel</h2>
+			<div class="timeline">
 
-	<!-- <div id="s_1" class="section">
-		<div class="img">
-			<img src="./images/jupe_cuir_profil.png" alt="photo de la jupe vue de profil">
-			<div class="description">
-				<p>Cette jupe en cuir, ornée de plis élégants sur les côtés, est une pièce unique que
-					j'ai conçue dans le cadre de mon CAP Cuir. Elle reflète à la fois un savoir-faire
-					traditionnel et une vision moderne de la mode. Réalisée avec un souci du détail,
-					elle a été présentée lors du défilé de fin d'année à La Sorbonne, où elle a rencontré
-					un accueil enthousiaste. Cette création illustre ma passion pour les matières nobles
-					et mon engagement à repousser les limites de l'artisanat dans le monde du luxe.</p>
+				<div class="timeline-item">
+					<div class="timeline-date">Depuis sept. 2025</div>
+					<div class="timeline-content">
+						<h3>Assistante Recherche & Développement</h3>
+						<p class="timeline-company">Yves Salomon — Paris</p>
+						<p class="timeline-type">CDI</p>
+						<p>Développement produit cuir et peau lainée au sein du service R&D. Recherche de nouvelles matières, suivi des prototypes et contribution à l'innovation produit pour les collections de la maison.</p>
+					</div>
+				</div>
 
-			</div>
-		</div>
-		<div class="out">
-			<div class="title">
-				<h2>Jupe en cuir
-				</h2>
-			</div>
-			<div class="ref">
-				<h2>CAP Cuir</h2>
-				<div class="arrow-down"></div>
-				<p class="text_ref">
-					Le CAP Vêtement de peau de Turquetil forme des artisans spécialisés dans la confection
-					de vêtements et accessoires en peau et cuir. Les étudiants y apprennent à maîtriser des
-					techniques artisanales, alliant tradition et modernité. Ce diplôme ouvre la voie à des
-					carrières dans le luxe et les ateliers de création haut de gamme, avec un savoir-faire recherché.			
-				</p>
-			</div>
-		</div>
-        
-	</div>
+				<div class="timeline-item">
+					<div class="timeline-date">Sept. 2022 — Août 2025</div>
+					<div class="timeline-content">
+						<h3>Assistante Recherche & Développement</h3>
+						<p class="timeline-company">Yves Salomon — Paris</p>
+						<p class="timeline-type">Alternance — 3 ans</p>
+						<p>Cuir, contrôle qualité, développement produit et suivi de production au sein d'une maison de luxe française reconnue pour son savoir-faire en fourrure et cuir depuis 1920.</p>
+					</div>
+				</div>
 
-	<div id="s_2" class="section">
-		<div class="img">
-			<img src="./images/manteau_fourrure_dos.png" alt="photo du manteau d'astrakan et de mouton doré">
-			<div class="description">
-				<p>Ce manteau en astrakan d'Afrique et mouton doré a été réalisé en 2021
-					dans le cadre d'un CAP Fourrure au Lycée Turquetil. La pièce se distingue
-					par ses incrustations soignées aux manches, démontrant un haut niveau
-					de précision et de maîtrise artisanale. Ce projet incarne l’alliance entre
-					tradition et créativité, illustrant la capacité à travailler des matières précieuses
-					comme l'astrakan tout en intégrant des éléments de design contemporain.
-					Ce manteau reflète l'expérience acquise pendant cette formation spécialisée en fourrure.</p>
+				<div class="timeline-item">
+					<div class="timeline-date">Sept. 2021 — Juil. 2022</div>
+					<div class="timeline-content">
+						<h3>Mécanicienne Cuir</h3>
+						<p class="timeline-company">L'Atelier Cuir — Paris</p>
+						<p class="timeline-type">Alternance</p>
+						<p>Participation au contrôle qualité sur les productions Louis Vuitton. Apprentissage des techniques de montage cuir et peaux lainées.</p>
+					</div>
+				</div>
 
-			</div>
-		</div>
-		<div class="out">
-			<div class="title">
-				<h2>Manteau en Astrakan
-				</h2>
-			</div>
-			<div class="ref">
-				<h2>CAP Fourrure</h2>
-				<div class="arrow-down"></div>
-				<p class="text_ref">
-					Le CAP Fourrure du Lycée Turquetil à Paris forme des artisans
-					spécialisés dans le travail des fourrures haut de gamme.
-					Les étudiants y apprennent des techniques complexes comme la coupe,
-					l'assemblage et l'incrustation, en utilisant des matériaux nobles tels que le vison,
-					l'astrakan ou le renard. Cette formation, reconnue dans l'industrie du luxe, prépare
-					à des carrières dans les maisons de haute couture et les ateliers spécialisés.			
-				</p>
+				<div class="timeline-item">
+					<div class="timeline-date">Fév. — Avr. 2021</div>
+					<div class="timeline-content">
+						<h3>Assistante responsable d'atelier</h3>
+						<p class="timeline-company">Yves Salomon — Paris</p>
+						<p class="timeline-type">Stage</p>
+						<p>Upcycling de fourrure, contribution à la mise au point de cahiers des charges et participation au contrôle qualité sur les productions Dior.</p>
+					</div>
+				</div>
+
+				<div class="timeline-item">
+					<div class="timeline-date">Janv. 2020</div>
+					<div class="timeline-content">
+						<h3>Habilleuse</h3>
+						<p class="timeline-company">Théâtre de la Tempête — Paris</p>
+						<p class="timeline-type">Stage</p>
+						<p>Fabrication d'un costume de patinage artistique en autonomie. Retouches et entretien quotidien des costumes de la pièce « Hélas ».</p>
+					</div>
+				</div>
+
+				<div class="timeline-item">
+					<div class="timeline-date">Sept. — Oct. 2019</div>
+					<div class="timeline-content">
+						<h3>Costumière Habilleuse</h3>
+						<p class="timeline-company">Le Moulin Rouge — Paris</p>
+						<p class="timeline-type">Stage</p>
+						<p>Renfort en habillage et apprentissage de conduite du show. Retouche et réparation sur les costumes du célèbre cabaret parisien.</p>
+					</div>
+				</div>
+
 			</div>
 		</div>
-        
-	</div> -->
+	</section>
 
+	<!-- FORMATION -->
+	<section id="formation" class="section-formation reveal">
+		<div class="container">
+			<h2 class="section-title">Formation</h2>
+			<div class="formation-grid">
+
+				<div class="formation-card">
+					<div class="formation-year">2022 — 2025</div>
+					<h3>Bachelor Modéliste Concepteur</h3>
+					<p class="formation-school">Institut Français de la Mode</p>
+					<p>Mode et conception de vêtements. Formation en alternance alliant exigence académique et immersion professionnelle. Déléguée de classe.</p>
+				</div>
+
+				<div class="formation-card">
+					<div class="formation-year">2021 — 2022</div>
+					<h3>CAP Vêtements de Peaux</h3>
+					<p class="formation-school">Lycée Turquetil — Paris</p>
+					<p>Confection de vêtements et accessoires en cuir. Maîtrise d'une machine à coudre triple entraînement. Obtenu avec la note de 18/20.</p>
+				</div>
+
+				<div class="formation-card">
+					<div class="formation-year">Certifications</div>
+					<h3>Diplômes obtenus</h3>
+					<p class="formation-school">Académie de Paris</p>
+					<p>Bachelor Modéliste Concepteur (2025), CAP Vêtements de Peaux (2022), ainsi que des certifications complémentaires en techniques de couture et confection.</p>
+				</div>
+
+			</div>
+		</div>
+	</section>
+
+	<!-- SAVOIR-FAIRE -->
+	<section id="savoirfaire" class="section-skills reveal">
+		<div class="container">
+			<h2 class="section-title">Savoir-faire</h2>
+			<div class="skills-grid">
+				<div class="skill-item">
+					<h3>Cuir & Peaux</h3>
+					<p>Montage cuir, peau lainée, techniques de coupe et assemblage de matières nobles</p>
+				</div>
+				<div class="skill-item">
+					<h3>Modélisme</h3>
+					<p>Conception de patrons, moulage, mise au point et développement de prototypes</p>
+				</div>
+				<div class="skill-item">
+					<h3>Contrôle qualité</h3>
+					<p>Vérification des standards de production pour des maisons telles que Louis Vuitton et Dior</p>
+				</div>
+				<div class="skill-item">
+					<h3>R&D Produit</h3>
+					<p>Recherche de matières, innovation textile et développement de nouvelles techniques</p>
+				</div>
+				<div class="skill-item">
+					<h3>Confection de costumes</h3>
+					<p>Habillage, retouche, pressing et entretien de costumes de spectacle</p>
+				</div>
+				<div class="skill-item">
+					<h3>Upcycling</h3>
+					<p>Revalorisation de matières premières et approche durable de la création</p>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<!-- PORTFOLIO & CV -->
+	<section id="documents" class="section-documents reveal">
+		<div class="container">
+			<h2 class="section-title">Portfolio & CV</h2>
+			<p class="documents-intro">Découvrez mon portfolio de collection 2025 réalisé dans le cadre de mon Bachelor à l'Institut Français de la Mode, ainsi que mon CV détaillé.</p>
+			<div class="documents-grid">
+				<a href="./images/Portfolio_collection_2025.pdf" target="_blank" class="document-card">
+					<div class="document-icon">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+					</div>
+					<h3>Portfolio</h3>
+					<p>Collection 2025</p>
+				</a>
+				<a href="./images/CV_CLARODE.pdf" download="CV_CLARODE.pdf" class="document-card">
+					<div class="document-icon">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+					</div>
+					<h3>Curriculum Vitae</h3>
+					<p>Télécharger le CV</p>
+				</a>
+			</div>
+		</div>
+	</section>
+
+	<!-- FOOTER / CONTACT -->
 	<footer id="contact">
-		<div class="socials">
-			<a href="mailto:larode.c@hotmail.com" aria-label="envoie un mail"><p>✉️ larode.c@hotmail.com</p></a>
-			<a href="https://www.linkedin.com/in/camille-larode-778516150"><img src="images/linkedin.png" alt="Logo de Linkedin"></a>
-			<a href="tel:+33615549446" aria-label="téléphone"><p>📞 +336 15 54 94 46</p></a>
+		<div class="container">
+			<h2 class="section-title">Contact</h2>
+			<p class="contact-intro">N'hésitez pas à me contacter pour toute opportunité professionnelle ou collaboration.</p>
+			<div class="contact-grid">
+				<a href="mailto:larode.c@hotmail.com" class="contact-item">
+					<span class="contact-label">Email</span>
+					<span class="contact-value">larode.c@hotmail.com</span>
+				</a>
+				<a href="tel:+33615549446" class="contact-item">
+					<span class="contact-label">Téléphone</span>
+					<span class="contact-value">+33 6 15 54 94 46</span>
+				</a>
+				<a href="https://www.linkedin.com/in/camille-larode-778516150" target="_blank" class="contact-item">
+					<span class="contact-label">LinkedIn</span>
+					<span class="contact-value">Camille Larode</span>
+				</a>
+			</div>
+			<div class="footer-location">
+				<p>Paris, Île-de-France</p>
+			</div>
 		</div>
-		</br>
-		<p id="bottom">Designed with Laurent Rahaingo       -       © 2026 All rights reserved</p>
+		<div class="footer-bottom">
+			<p>Designed with Laurent Rahaingo &mdash; &copy; 2026 All rights reserved</p>
+		</div>
 	</footer>
+
 </body>
 </html>
