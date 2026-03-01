@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /images/CV_CLARODE.pdf
+Disallow: /images/Portfolio_collection_2025.pdf
+
+Sitemap: https://camille-larode.fr/sitemap.xml
