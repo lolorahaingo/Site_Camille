@@ -4,28 +4,30 @@
 
   var WORKER_URL = 'https://contact-worker.lolorahaingo.workers.dev';
 
-  // --- Turnstile : clé de test en localhost uniquement ---
+  // --- Turnstile : rendu explicite ---
   var isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-  if (isLocal) {
-    var turnstileEl = document.querySelector('.cf-turnstile');
-    if (turnstileEl) {
-      turnstileEl.setAttribute('data-sitekey', '0x4AAAAAACluaw9FuPjWzSJf');
-    }
-  }
+  var SITEKEY = isLocal ? '0x4AAAAAACluaw9FuPjWzSJf' : '0x4AAAAAAClt6E0oLViwxZcK';
+  var turnstileWidgetId = null;
+  var pendingSend = false;
+
+  window.onTurnstileLoad = function () {
+    turnstileWidgetId = turnstile.render('#turnstile-container', {
+      sitekey: SITEKEY,
+      size: 'invisible',
+      execution: 'execute',
+      callback: function (token) {
+        if (pendingSend) {
+          pendingSend = false;
+          sendForm(token);
+        }
+      }
+    });
+  };
 
   var form = document.getElementById('contact-form');
   if (!form) return;
 
   var submitBtn = form.querySelector('button[type="submit"]');
-
-  // --- Turnstile : callback appelé quand le token est prêt ---
-  var pendingSend = false;
-  window.onTurnstileCallback = function (token) {
-    if (pendingSend) {
-      pendingSend = false;
-      sendForm(token);
-    }
-  };
 
   function sendForm(token) {
     var nom = form.querySelector('#field-nom').value.trim();
@@ -85,9 +87,9 @@
     submitBtn.textContent = 'V\u00e9rification...';
     pendingSend = true;
 
-    if (typeof turnstile !== 'undefined') {
-      turnstile.reset();
-      turnstile.execute();
+    if (typeof turnstile !== 'undefined' && turnstileWidgetId !== null) {
+      turnstile.reset(turnstileWidgetId);
+      turnstile.execute(turnstileWidgetId);
     } else {
       pendingSend = false;
       submitBtn.disabled = false;
