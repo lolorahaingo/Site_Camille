@@ -18,25 +18,16 @@
 
   var submitBtn = form.querySelector('button[type="submit"]');
 
-  // --- Turnstile : stocker le token dès qu'il est prêt ---
-  var turnstileToken = '';
+  // --- Turnstile : callback appelé quand le token est prêt ---
+  var pendingSend = false;
   window.onTurnstileCallback = function (token) {
-    turnstileToken = token;
+    if (pendingSend) {
+      pendingSend = false;
+      sendForm(token);
+    }
   };
 
-  function getTurnstileToken() {
-    if (turnstileToken) return turnstileToken;
-    var el = document.querySelector('[name="cf-turnstile-response"]');
-    return el ? el.value : '';
-  }
-
-  function sendForm() {
-    var token = getTurnstileToken();
-    if (!token) {
-      showStatus('error', 'La v\u00e9rification anti-bot a \u00e9chou\u00e9. Rechargez la page et r\u00e9essayez.');
-      return;
-    }
-
+  function sendForm(token) {
     var nom = form.querySelector('#field-nom').value.trim();
     var email = form.querySelector('#field-email').value.trim();
     var objet = form.querySelector('#field-objet').value;
@@ -52,9 +43,6 @@
       'cf-turnstile-response': token
     };
 
-    // Loading state
-    submitBtn.disabled = true;
-    submitBtn.classList.add('contact-form__btn--loading');
     submitBtn.textContent = 'Envoi en cours...';
 
     fetch(WORKER_URL, {
@@ -91,37 +79,22 @@
       return;
     }
 
-    // Si le token est déjà prêt, envoyer directement
-    if (getTurnstileToken()) {
-      sendForm();
-      return;
-    }
-
-    // Sinon, déclencher Turnstile et attendre le token
+    // Désactiver le bouton et demander un token frais
     submitBtn.disabled = true;
+    submitBtn.classList.add('contact-form__btn--loading');
     submitBtn.textContent = 'V\u00e9rification...';
+    pendingSend = true;
 
     if (typeof turnstile !== 'undefined') {
-      var widgetId = document.querySelector('.cf-turnstile iframe')
-        ? turnstile.getResponse() ? null : null
-        : null;
+      turnstile.reset();
       turnstile.execute();
+    } else {
+      pendingSend = false;
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('contact-form__btn--loading');
+      submitBtn.textContent = 'Envoyer';
+      showStatus('error', 'La v\u00e9rification anti-bot n\'a pas pu se charger. Rechargez la page.');
     }
-
-    // Attendre le token (max 10 secondes)
-    var attempts = 0;
-    var waitForToken = setInterval(function () {
-      attempts++;
-      if (getTurnstileToken()) {
-        clearInterval(waitForToken);
-        sendForm();
-      } else if (attempts > 40) {
-        clearInterval(waitForToken);
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Envoyer';
-        showStatus('error', 'La v\u00e9rification anti-bot a expir\u00e9. Rechargez la page et r\u00e9essayez.');
-      }
-    }, 250);
   });
 
   function showStatus(state, errorMessage) {
