@@ -2,30 +2,6 @@
 
 var WORKER_URL = 'https://contact-worker.lolorahaingo.workers.dev';
 
-// --- Turnstile : rendu explicite ---
-var isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-var SITEKEY = isLocal ? '0x4AAAAAACluaw9FuPjWzSJf' : '0x4AAAAAAClt6E0oLViwxZcK';
-var turnstileWidgetId = null;
-
-window.onTurnstileLoad = function () {
-  turnstileWidgetId = turnstile.render('#turnstile-container', {
-    sitekey: SITEKEY,
-    size: 'invisible',
-    execution: 'execute',
-    callback: function (token) {
-      doSend(token);
-    },
-    'error-callback': function () {
-      var btn = document.querySelector('#contact-form button[type="submit"]');
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = 'Envoyer';
-      }
-      showStatus('error', 'La v\u00e9rification anti-bot a \u00e9chou\u00e9. Rechargez la page et r\u00e9essayez.');
-    }
-  });
-};
-
 var form = document.getElementById('contact-form');
 var submitBtn = form ? form.querySelector('button[type="submit"]') : null;
 
@@ -44,53 +20,49 @@ if (form) {
       return;
     }
 
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'V\u00e9rification...';
-
-    if (typeof turnstile !== 'undefined' && turnstileWidgetId !== null) {
-      turnstile.execute(turnstileWidgetId);
-    } else {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Envoyer';
-      showStatus('error', 'La v\u00e9rification anti-bot n\'a pas pu se charger. Rechargez la page.');
+    // Récupérer le token Turnstile
+    var turnstileInput = form.querySelector('[name="cf-turnstile-response"]');
+    var token = turnstileInput ? turnstileInput.value : '';
+    if (!token) {
+      alert('Veuillez compl\u00e9ter la v\u00e9rification anti-bot.');
+      return;
     }
-  });
-}
 
-function doSend(token) {
-  var nom = form.querySelector('#field-nom').value.trim();
-  var email = form.querySelector('#field-email').value.trim();
-  var objet = form.querySelector('#field-objet').value;
-  var message = form.querySelector('#field-message').value.trim();
-  var honeypot = form.querySelector('input[name="_gotcha"]');
+    var nom = form.querySelector('#field-nom').value.trim();
+    var email = form.querySelector('#field-email').value.trim();
+    var objet = form.querySelector('#field-objet').value;
+    var message = form.querySelector('#field-message').value.trim();
+    var honeypot = form.querySelector('input[name="_gotcha"]');
 
-  var data = {
-    nom: nom,
-    email: email,
-    message: 'Objet : ' + objet + '\n\n' + message,
-    _gotcha: honeypot ? honeypot.value : '',
-    rgpd: true,
-    'cf-turnstile-response': token
-  };
+    var data = {
+      nom: nom,
+      email: email,
+      message: 'Objet : ' + objet + '\n\n' + message,
+      _gotcha: honeypot ? honeypot.value : '',
+      rgpd: true,
+      'cf-turnstile-response': token
+    };
 
-  submitBtn.textContent = 'Envoi en cours...';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Envoi en cours...';
 
-  fetch(WORKER_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  })
-  .then(function (response) {
-    return response.json().then(function (json) {
-      if (response.ok && json.success) {
-        showStatus('success');
-      } else {
-        showStatus('error', json.error || 'Une erreur est survenue.');
-      }
+    fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    .then(function (response) {
+      return response.json().then(function (json) {
+        if (response.ok && json.success) {
+          showStatus('success');
+        } else {
+          showStatus('error', json.error || 'Une erreur est survenue.');
+        }
+      });
+    })
+    .catch(function () {
+      showStatus('error', 'Impossible de contacter le serveur.');
     });
-  })
-  .catch(function () {
-    showStatus('error', 'Impossible de contacter le serveur.');
   });
 }
 
@@ -120,7 +92,6 @@ function showStatus(state, errorMessage) {
 
   if (state === 'error') {
     submitBtn.disabled = false;
-    submitBtn.classList.remove('contact-form__btn--loading');
     submitBtn.textContent = 'Envoyer';
 
     var msg = document.createElement('div');
