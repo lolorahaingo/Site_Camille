@@ -73,9 +73,16 @@
 
       var msg = document.createElement('div');
       msg.className = 'contact-form__status contact-form__status--success';
-      msg.innerHTML =
-        '<p class="contact-form__status-title">Message envoy\u00e9 !</p>' +
-        '<p>Merci pour votre message. Je vous r\u00e9pondrai dans les plus brefs d\u00e9lais.</p>';
+
+      var pTitle = document.createElement('p');
+      pTitle.className = 'contact-form__status-title';
+      pTitle.textContent = 'Message envoy\u00e9 !';
+      msg.appendChild(pTitle);
+
+      var pBody = document.createElement('p');
+      pBody.textContent = 'Merci pour votre message. Je vous r\u00e9pondrai dans les plus brefs d\u00e9lais.';
+      msg.appendChild(pBody);
+
       form.parentNode.insertBefore(msg, form);
     }
 
@@ -86,10 +93,19 @@
 
       var msg = document.createElement('div');
       msg.className = 'contact-form__status contact-form__status--error';
-      msg.innerHTML =
-        '<p>' + (errorMessage || 'Une erreur est survenue.') + '</p>' +
-        '<p>Vous pouvez m\'\u00e9crire directement \u00e0 ' +
-        '<a href="mailto:larode.c@hotmail.com">larode.c@hotmail.com</a></p>';
+
+      var pError = document.createElement('p');
+      pError.textContent = errorMessage || 'Une erreur est survenue.';
+      msg.appendChild(pError);
+
+      var pFallback = document.createElement('p');
+      pFallback.textContent = 'Vous pouvez m\'\u00e9crire directement \u00e0 ';
+      var mailLink = document.createElement('a');
+      mailLink.href = 'mailto:larode.c@hotmail.com';
+      mailLink.textContent = 'larode.c@hotmail.com';
+      pFallback.appendChild(mailLink);
+      msg.appendChild(pFallback);
+
       form.parentNode.insertBefore(msg, form);
     }
   }
