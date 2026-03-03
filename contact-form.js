@@ -4,13 +4,13 @@
 
   var WORKER_URL = 'https://contact-worker.lolorahaingo.workers.dev';
 
-  // --- Turnstile : clé locale vs production ---
-  var turnstileEl = document.querySelector('.cf-turnstile');
-  if (turnstileEl) {
-    var isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-    turnstileEl.setAttribute('data-sitekey',
-      isLocal ? '0x4AAAAAACluaw9FuPjWzSJf' : '0x4AAAAAAClt6E0oLViwxZcK'
-    );
+  // --- Turnstile : clé de test en localhost uniquement ---
+  var isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if (isLocal) {
+    var turnstileEl = document.querySelector('.cf-turnstile');
+    if (turnstileEl) {
+      turnstileEl.setAttribute('data-sitekey', '0x4AAAAAACluaw9FuPjWzSJf');
+    }
   }
 
   var form = document.getElementById('contact-form');
