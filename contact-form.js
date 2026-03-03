@@ -2,12 +2,6 @@
 
 var WORKER_URL = 'https://contact-worker.lolorahaingo.workers.dev';
 
-// Clé de test Turnstile en localhost
-if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-  var tw = document.querySelector('.cf-turnstile');
-  if (tw) tw.setAttribute('data-sitekey', '0x4AAAAAACluaw9FuPjWzSJf');
-}
-
 var form = document.getElementById('contact-form');
 var submitBtn = form ? form.querySelector('button[type="submit"]') : null;
 
@@ -26,14 +20,6 @@ if (form) {
       return;
     }
 
-    // Récupérer le token Turnstile
-    var turnstileInput = form.querySelector('[name="cf-turnstile-response"]');
-    var token = turnstileInput ? turnstileInput.value : '';
-    if (!token) {
-      alert('Veuillez compl\u00e9ter la v\u00e9rification anti-bot.');
-      return;
-    }
-
     var nom = form.querySelector('#field-nom').value.trim();
     var email = form.querySelector('#field-email').value.trim();
     var objet = form.querySelector('#field-objet').value;
@@ -45,8 +31,7 @@ if (form) {
       email: email,
       message: 'Objet : ' + objet + '\n\n' + message,
       _gotcha: honeypot ? honeypot.value : '',
-      rgpd: true,
-      'cf-turnstile-response': token
+      rgpd: true
     };
 
     submitBtn.disabled = true;
