@@ -24,6 +24,14 @@
       return;
     }
 
+    // Vérification Turnstile
+    var turnstileResponse = document.querySelector('[name="cf-turnstile-response"]');
+    var turnstileToken = turnstileResponse ? turnstileResponse.value : '';
+    if (!turnstileToken) {
+      alert('Veuillez compl\u00e9ter la v\u00e9rification anti-bot.');
+      return;
+    }
+
     var nom = form.querySelector('#field-nom').value.trim();
     var email = form.querySelector('#field-email').value.trim();
     var objet = form.querySelector('#field-objet').value;
@@ -35,7 +43,8 @@
       email: email,
       message: 'Objet : ' + objet + '\n\n' + message,
       _gotcha: honeypot ? honeypot.value : '',
-      rgpd: true
+      rgpd: true,
+      'cf-turnstile-response': turnstileToken
     };
 
     // Loading state

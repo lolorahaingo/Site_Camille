@@ -11,7 +11,7 @@
 	<meta name="keywords" content="Camille Larode, modéliste, R&D cuir, peau lainée, Yves Salomon, Institut Français de la Mode, IFM, mode, luxe, Paris, développement produit, modélisme, cuir">
 	<meta name="author" content="Camille Larode">
 	<meta name="robots" content="index, follow">
-	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self'; connect-src https://contact-worker.lolorahaingo.workers.dev; base-uri 'self'; form-action 'self';">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self'; frame-src https://challenges.cloudflare.com; connect-src https://contact-worker.lolorahaingo.workers.dev; base-uri 'self'; form-action 'self';">
 	<link rel="canonical" href="https://camille-larode.fr/">
 
 	<!-- Open Graph (partage réseaux sociaux) -->
@@ -346,10 +346,14 @@
 					</label>
 				</div>
 
+				<!-- Turnstile anti-bot -->
+				<div class="cf-turnstile" data-sitekey="VOTRE_SITE_KEY_CAMILLE" data-theme="light"></div>
+
 				<div class="contact-form__submit">
 					<button type="submit" class="contact-form__btn">Envoyer</button>
 				</div>
 			</form>
+			<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 
 			<p class="contact-form__fallback">
 				Vous pouvez aussi m'&eacute;crire directement &agrave;
