@@ -1,3 +1,4 @@
+@charset "UTF-8";
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -741,6 +742,33 @@ footer .contact-form__textarea {
   resize: vertical;
   min-height: 100px;
 }
+footer .contact-form__group--consent {
+  margin-top: 1.2rem;
+}
+footer .contact-form__consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 0.78rem;
+  color: #666;
+  cursor: pointer;
+  line-height: 1.6;
+}
+footer .contact-form__consent input[type=checkbox] {
+  accent-color: #111;
+  width: 16px;
+  height: 16px;
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+footer .contact-form__consent a {
+  color: #111;
+  text-decoration: underline;
+}
+footer .contact-form__consent a:hover {
+  color: #666;
+}
 footer .contact-form__submit {
   text-align: center;
   margin-top: 1.5rem;
@@ -851,6 +879,66 @@ footer .footer-bottom p {
   }
   footer .contact-item {
     padding: 1rem;
+  }
+}
+.section-legal {
+  padding: 8rem 2rem 4rem;
+}
+.section-legal .container {
+  max-width: 700px;
+  margin: 0 auto;
+}
+.section-legal .section-title {
+  margin-bottom: 2rem;
+}
+
+.legal-content h2 {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: #111;
+  margin-top: 2.5rem;
+  margin-bottom: 0.6rem;
+}
+.legal-content h3 {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #111;
+  margin-top: 1.8rem;
+  margin-bottom: 0.5rem;
+}
+.legal-content p, .legal-content li {
+  font-size: 0.9rem;
+  color: #666;
+  line-height: 1.8;
+  margin-bottom: 0.5rem;
+}
+.legal-content ul {
+  list-style: none;
+  padding: 0;
+}
+.legal-content ul li {
+  padding-left: 1rem;
+  position: relative;
+}
+.legal-content ul li::before {
+  content: "—";
+  color: #e0e0e0;
+  position: absolute;
+  left: 0;
+}
+.legal-content a {
+  color: #111;
+  text-decoration: underline;
+}
+.legal-content a:hover {
+  color: #666;
+}
+
+@media screen and (max-width: 600px) {
+  .section-legal {
+    padding: 6rem 1.2rem 3rem;
   }
 }
 .reveal {

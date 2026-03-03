@@ -909,6 +909,38 @@ footer {
             min-height: 100px;
         }
 
+        &__group--consent {
+            margin-top: 1.2rem;
+        }
+
+        &__consent {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.6rem;
+            font-size: 0.78rem;
+            color: $color-gray;
+            cursor: pointer;
+            line-height: 1.6;
+
+            input[type="checkbox"] {
+                accent-color: $color-black;
+                width: 16px;
+                height: 16px;
+                margin-top: 0.15rem;
+                flex-shrink: 0;
+                cursor: pointer;
+            }
+
+            a {
+                color: $color-black;
+                text-decoration: underline;
+
+                &:hover {
+                    color: $color-gray;
+                }
+            }
+        }
+
         &__submit {
             text-align: center;
             margin-top: 1.5rem;
@@ -1044,6 +1076,81 @@ footer {
         .contact-item {
             padding: 1rem;
         }
+    }
+}
+
+// ─────────────────────────────────────────
+// LEGAL PAGE
+// ─────────────────────────────────────────
+.section-legal {
+    padding: 8rem 2rem 4rem;
+
+    .container {
+        max-width: 700px;
+        margin: 0 auto;
+    }
+
+    .section-title {
+        margin-bottom: 2rem;
+    }
+}
+
+.legal-content {
+    h2 {
+        font-family: $font-body;
+        font-size: 1.05rem;
+        font-weight: 500;
+        color: $color-black;
+        margin-top: 2.5rem;
+        margin-bottom: 0.6rem;
+    }
+
+    h3 {
+        font-family: $font-body;
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: $color-black;
+        margin-top: 1.8rem;
+        margin-bottom: 0.5rem;
+    }
+
+    p, li {
+        font-size: 0.9rem;
+        color: $color-gray;
+        line-height: 1.8;
+        margin-bottom: 0.5rem;
+    }
+
+    ul {
+        list-style: none;
+        padding: 0;
+
+        li {
+            padding-left: 1rem;
+            position: relative;
+
+            &::before {
+                content: "\2014";
+                color: $color-border;
+                position: absolute;
+                left: 0;
+            }
+        }
+    }
+
+    a {
+        color: $color-black;
+        text-decoration: underline;
+
+        &:hover {
+            color: $color-gray;
+        }
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .section-legal {
+        padding: 6rem 1.2rem 3rem;
     }
 }
 

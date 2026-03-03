@@ -17,6 +17,13 @@
       return;
     }
 
+    // Vérification RGPD côté JS (en plus du required HTML)
+    var rgpdCheckbox = form.querySelector('input[name="rgpd"]');
+    if (!rgpdCheckbox || !rgpdCheckbox.checked) {
+      alert('Veuillez accepter la politique de confidentialité pour envoyer votre message.');
+      return;
+    }
+
     var nom = form.querySelector('#field-nom').value.trim();
     var email = form.querySelector('#field-email').value.trim();
     var objet = form.querySelector('#field-objet').value;
@@ -27,7 +34,8 @@
       nom: nom,
       email: email,
       message: 'Objet : ' + objet + '\n\n' + message,
-      _gotcha: honeypot ? honeypot.value : ''
+      _gotcha: honeypot ? honeypot.value : '',
+      rgpd: true
     };
 
     // Loading state
