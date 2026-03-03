@@ -299,14 +299,61 @@
 	<footer id="contact">
 		<div class="container">
 			<h2 class="section-title">Contact</h2>
-			<p class="contact-intro">N'hésitez pas à me contacter pour toute opportunité professionnelle ou collaboration.</p>
+			<p class="contact-intro">N'h&eacute;sitez pas &agrave; me contacter pour toute opportunit&eacute; professionnelle ou collaboration.</p>
+
+			<!-- Formulaire de contact -->
+			<form class="contact-form" id="contact-form" novalidate>
+
+				<!-- Honeypot anti-spam -->
+				<div style="position:absolute;left:-9999px;" aria-hidden="true">
+					<input type="text" name="_gotcha" tabindex="-1" autocomplete="off">
+				</div>
+
+				<div class="contact-form__row">
+					<div class="contact-form__group">
+						<label class="contact-form__label" for="field-nom">Nom / Pr&eacute;nom <span class="contact-form__required">*</span></label>
+						<input class="contact-form__input" type="text" id="field-nom" name="nom" required maxlength="80" placeholder="Votre nom">
+					</div>
+					<div class="contact-form__group">
+						<label class="contact-form__label" for="field-email">Email <span class="contact-form__required">*</span></label>
+						<input class="contact-form__input" type="email" id="field-email" name="email" required maxlength="100" placeholder="votre@email.fr">
+					</div>
+				</div>
+
+				<div class="contact-form__group">
+					<label class="contact-form__label" for="field-objet">Objet <span class="contact-form__required">*</span></label>
+					<select class="contact-form__select" id="field-objet" name="objet" required>
+						<option value="">-- Choisir --</option>
+						<option value="Opportunit&eacute; professionnelle">Opportunit&eacute; professionnelle</option>
+						<option value="Collaboration">Collaboration</option>
+						<option value="Demande de cours / formation">Demande de cours / formation</option>
+						<option value="Demande de cr&eacute;ation / mod&eacute;lisme">Demande de cr&eacute;ation / mod&eacute;lisme</option>
+						<option value="Autre">Autre</option>
+					</select>
+				</div>
+
+				<div class="contact-form__group">
+					<label class="contact-form__label" for="field-message">Message <span class="contact-form__required">*</span></label>
+					<textarea class="contact-form__textarea" id="field-message" name="message" required maxlength="1000" rows="5" placeholder="Votre message..."></textarea>
+				</div>
+
+				<div class="contact-form__submit">
+					<button type="submit" class="contact-form__btn">Envoyer</button>
+				</div>
+			</form>
+
+			<p class="contact-form__fallback">
+				Vous pouvez aussi m'&eacute;crire directement &agrave;
+				<a href="mailto:larode.c@hotmail.com">larode.c@hotmail.com</a>
+			</p>
+
 			<div class="contact-grid">
 				<a href="mailto:larode.c@hotmail.com" class="contact-item">
 					<span class="contact-label">Email</span>
 					<span class="contact-value">larode.c@hotmail.com</span>
 				</a>
 				<a href="tel:+33615549446" class="contact-item">
-					<span class="contact-label">Téléphone</span>
+					<span class="contact-label">T&eacute;l&eacute;phone</span>
 					<span class="contact-value">+33 6 15 54 94 46</span>
 				</a>
 				<a href="https://www.linkedin.com/in/camille-larode-778516150" target="_blank" class="contact-item">
@@ -315,13 +362,15 @@
 				</a>
 			</div>
 			<div class="footer-location">
-				<p>Paris, Île-de-France</p>
+				<p>Paris, &Icirc;le-de-France</p>
 			</div>
 		</div>
 		<div class="footer-bottom">
 			<p>Designed with Laurent Rahaingo &mdash; &copy; 2026 All rights reserved</p>
 		</div>
 	</footer>
+
+	<script src="contact-form.js" defer></script>
 
 </body>
 </html>

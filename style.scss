@@ -841,6 +841,170 @@ footer {
         }
     }
 
+    // ── Contact form ──
+    .contact-form {
+        max-width: 550px;
+        margin: 0 auto 3rem;
+
+        &__row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        &__group {
+            margin-bottom: 1.2rem;
+        }
+
+        &__label {
+            display: block;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: $color-gray;
+            margin-bottom: 0.4rem;
+        }
+
+        &__required {
+            color: $color-black;
+        }
+
+        &__input,
+        &__select,
+        &__textarea {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            font-family: $font-body;
+            font-size: 0.9rem;
+            font-weight: 300;
+            color: $color-black;
+            background-color: $color-white;
+            border: 1px solid $color-border;
+            border-radius: 0;
+            outline: none;
+            transition: border-color 0.3s ease;
+
+            &:focus {
+                border-color: $color-black;
+            }
+
+            &::placeholder {
+                color: #bbb;
+                font-weight: 300;
+            }
+        }
+
+        &__select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' fill='none' stroke-width='1.5'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            padding-right: 2.5rem;
+            cursor: pointer;
+        }
+
+        &__textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        &__submit {
+            text-align: center;
+            margin-top: 1.5rem;
+        }
+
+        &__btn {
+            display: inline-block;
+            padding: 0.8rem 3rem;
+            font-family: $font-body;
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: $color-white;
+            background-color: $color-black;
+            border: 1px solid $color-black;
+            cursor: pointer;
+            transition: background-color 0.3s ease, color 0.3s ease;
+
+            &:hover {
+                background-color: $color-white;
+                color: $color-black;
+            }
+
+            &--loading {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+        }
+
+        &__fallback {
+            text-align: center;
+            font-size: 0.82rem;
+            color: $color-gray;
+            margin-bottom: 3rem;
+
+            a {
+                color: $color-black;
+                text-decoration: underline;
+
+                &:hover {
+                    color: $color-gray;
+                }
+            }
+        }
+
+        &__status {
+            max-width: 550px;
+            margin: 0 auto 2rem;
+            padding: 1.5rem 2rem;
+            text-align: center;
+
+            p {
+                font-size: 0.9rem;
+                color: $color-gray;
+                line-height: 1.7;
+                margin-bottom: 0.3rem;
+            }
+
+            a {
+                color: $color-black;
+                text-decoration: underline;
+            }
+
+            &--success {
+                border: 1px solid $color-black;
+
+                .contact-form__status-title {
+                    font-family: $font-display;
+                    font-size: 1.2rem;
+                    color: $color-black;
+                    margin-bottom: 0.5rem;
+                }
+            }
+
+            &--error {
+                border: 1px solid #c0392b;
+
+                p {
+                    color: #c0392b;
+                }
+
+                a {
+                    color: $color-black;
+                }
+            }
+        }
+    }
+
+    @media screen and (max-width: 600px) {
+        .contact-form__row {
+            grid-template-columns: 1fr;
+            gap: 0;
+        }
+    }
+
     .footer-location {
         text-align: center;
         margin-top: 1.5rem;
