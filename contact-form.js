@@ -18,26 +18,22 @@
 
   var submitBtn = form.querySelector('button[type="submit"]');
 
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
+  // --- Turnstile : stocker le token dès qu'il est prêt ---
+  var turnstileToken = '';
+  window.onTurnstileCallback = function (token) {
+    turnstileToken = token;
+  };
 
-    if (!form.checkValidity()) {
-      form.reportValidity();
-      return;
-    }
+  function getTurnstileToken() {
+    if (turnstileToken) return turnstileToken;
+    var el = document.querySelector('[name="cf-turnstile-response"]');
+    return el ? el.value : '';
+  }
 
-    // Vérification RGPD côté JS (en plus du required HTML)
-    var rgpdCheckbox = form.querySelector('input[name="rgpd"]');
-    if (!rgpdCheckbox || !rgpdCheckbox.checked) {
-      alert('Veuillez accepter la politique de confidentialité pour envoyer votre message.');
-      return;
-    }
-
-    // Vérification Turnstile
-    var turnstileResponse = document.querySelector('[name="cf-turnstile-response"]');
-    var turnstileToken = turnstileResponse ? turnstileResponse.value : '';
-    if (!turnstileToken) {
-      alert('Veuillez compl\u00e9ter la v\u00e9rification anti-bot.');
+  function sendForm() {
+    var token = getTurnstileToken();
+    if (!token) {
+      showStatus('error', 'La v\u00e9rification anti-bot a \u00e9chou\u00e9. Rechargez la page et r\u00e9essayez.');
       return;
     }
 
@@ -53,7 +49,7 @@
       message: 'Objet : ' + objet + '\n\n' + message,
       _gotcha: honeypot ? honeypot.value : '',
       rgpd: true,
-      'cf-turnstile-response': turnstileToken
+      'cf-turnstile-response': token
     };
 
     // Loading state
@@ -78,6 +74,54 @@
     .catch(function () {
       showStatus('error', 'Impossible de contacter le serveur.');
     });
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return;
+    }
+
+    // Vérification RGPD côté JS (en plus du required HTML)
+    var rgpdCheckbox = form.querySelector('input[name="rgpd"]');
+    if (!rgpdCheckbox || !rgpdCheckbox.checked) {
+      alert('Veuillez accepter la politique de confidentialit\u00e9 pour envoyer votre message.');
+      return;
+    }
+
+    // Si le token est déjà prêt, envoyer directement
+    if (getTurnstileToken()) {
+      sendForm();
+      return;
+    }
+
+    // Sinon, déclencher Turnstile et attendre le token
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'V\u00e9rification...';
+
+    if (typeof turnstile !== 'undefined') {
+      var widgetId = document.querySelector('.cf-turnstile iframe')
+        ? turnstile.getResponse() ? null : null
+        : null;
+      turnstile.execute();
+    }
+
+    // Attendre le token (max 10 secondes)
+    var attempts = 0;
+    var waitForToken = setInterval(function () {
+      attempts++;
+      if (getTurnstileToken()) {
+        clearInterval(waitForToken);
+        sendForm();
+      } else if (attempts > 40) {
+        clearInterval(waitForToken);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Envoyer';
+        showStatus('error', 'La v\u00e9rification anti-bot a expir\u00e9. Rechargez la page et r\u00e9essayez.');
+      }
+    }, 250);
   });
 
   function showStatus(state, errorMessage) {
