@@ -2,10 +2,43 @@
 
 var WORKER_URL = 'https://contact-worker.lolorahaingo.workers.dev';
 
+var TURNSTILE_SITEKEYS = {
+  'camille-larode.fr': '0x4AAAAAAClt6E0oLViwxZcK',
+  'www.camille-larode.fr': '0x4AAAAAAClt6E0oLViwxZcK',
+  'localhost': '0x4AAAAAACluaw9FuPjWzSJf',
+  '127.0.0.1': '0x4AAAAAACluaw9FuPjWzSJf'
+};
+var TURNSTILE_SITEKEY = TURNSTILE_SITEKEYS[window.location.hostname] || TURNSTILE_SITEKEYS['localhost'];
+var turnstileToken = '';
+
 var form = document.getElementById('contact-form');
 var submitBtn = form ? form.querySelector('button[type="submit"]') : null;
 
 if (form) {
+  // --- Cloudflare Turnstile antibot ---
+  function renderTurnstile() {
+    if (typeof turnstile !== 'undefined') {
+      turnstile.render('#turnstile-container', {
+        sitekey: TURNSTILE_SITEKEY,
+        appearance: 'interaction-only',
+        language: 'fr',
+        callback: function (token) {
+          turnstileToken = token;
+        },
+        'error-callback': function () {
+          turnstileToken = '';
+        },
+        'expired-callback': function () {
+          turnstileToken = '';
+        }
+      });
+    } else {
+      // Script not loaded yet, retry in 200ms
+      setTimeout(renderTurnstile, 200);
+    }
+  }
+  renderTurnstile();
+
   form.addEventListener('submit', function (e) {
     e.preventDefault();
 
@@ -20,6 +53,11 @@ if (form) {
       return;
     }
 
+    if (!turnstileToken) {
+      alert('Veuillez patienter pendant la vérification antibot, puis réessayez.');
+      return;
+    }
+
     var nom = form.querySelector('#field-nom').value.trim();
     var email = form.querySelector('#field-email').value.trim();
     var objet = form.querySelector('#field-objet').value;
@@ -31,7 +69,8 @@ if (form) {
       email: email,
       message: 'Objet : ' + objet + '\n\n' + message,
       _gotcha: honeypot ? honeypot.value : '',
-      rgpd: true
+      rgpd: true,
+      'cf-turnstile-response': turnstileToken
     };
 
     submitBtn.disabled = true;
@@ -46,13 +85,16 @@ if (form) {
       return response.json().then(function (json) {
         if (response.ok && json.success) {
           showStatus('success');
+          turnstileToken = '';
         } else {
           showStatus('error', json.error || 'Une erreur est survenue.');
+          if (typeof turnstile !== 'undefined') { turnstile.reset(); turnstileToken = ''; }
         }
       });
     })
     .catch(function () {
       showStatus('error', 'Impossible de contacter le serveur.');
+      if (typeof turnstile !== 'undefined') { turnstile.reset(); turnstileToken = ''; }
     });
   });
 }
