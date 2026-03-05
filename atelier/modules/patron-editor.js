@@ -855,7 +855,9 @@ export class PatronEditor {
 	// Close a contour → create patron
 	// ============================================================
 	_closeContour(contour) {
-		// Build SVG path and extract segment metadata for later editing
+		// Build SVG path and extract segment metadata for later editing.
+		// The contour has N points and N-1 segments (the closing segment is implicit).
+		// We need to add the closing segment (last point → first point) to the metadata.
 		const vertices = contour.points.map(p => ({ x: p.x, y: p.y }));
 		const segmentsMeta = [];
 		let pathStr = `M ${contour.points[0].x} ${contour.points[0].y}`;
@@ -878,6 +880,14 @@ export class PatronEditor {
 				segmentsMeta.push({ type: 'Q', cp });
 			}
 		}
+
+		// Add the implicit closing segment (last vertex → first vertex)
+		// This segment is represented by Z in SVG but needs an explicit entry in metadata
+		// so that edit mode knows about all N sides of the polygon.
+		if (segmentsMeta.length < vertices.length) {
+			segmentsMeta.push({ type: 'L' });
+		}
+
 		pathStr += ' Z';
 
 		// Remove contour objects from canvas
