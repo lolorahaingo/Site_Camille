@@ -1043,11 +1043,6 @@ function initKeyboardShortcuts() {
 				case 'c': setActiveTool('curve'); break;
 				case 'a': setActiveTool('arc'); break;
 				case 'r': setActiveTool('rect'); break;
-				case 'g':
-					state.gridVisible = !state.gridVisible;
-					document.getElementById('btn-toggle-grid').classList.toggle('toggled', state.gridVisible);
-					drawGrid();
-					break;
 			}
 		}
 
@@ -1085,11 +1080,12 @@ function initKeyboardShortcuts() {
 		if (e.key === '-') zoomOut();
 		if (e.key === '0' && !ctrl) zoomToFit();
 
-		// Escape
+		// Escape — park the current drawing (don't delete it)
 		if (e.key === 'Escape') {
 			if (window.atelierModules?.patronEditor) {
-				window.atelierModules.patronEditor.cancelDrawing();
+				window.atelierModules.patronEditor.parkDrawing();
 			}
+			setActiveTool('select');
 			removeContextMenu();
 		}
 	});
@@ -1111,15 +1107,6 @@ function initToolbar() {
 	document.querySelectorAll('.toolbar__btn[data-tool]').forEach(btn => {
 		btn.addEventListener('click', () => setActiveTool(btn.dataset.tool));
 	});
-
-	// Grid toggle
-	document.getElementById('btn-toggle-grid').addEventListener('click', () => {
-		state.gridVisible = !state.gridVisible;
-		document.getElementById('btn-toggle-grid').classList.toggle('toggled', state.gridVisible);
-		drawGrid();
-	});
-	// Set initial grid state
-	document.getElementById('btn-toggle-grid').classList.add('toggled');
 
 	// Snap toggle
 	document.getElementById('btn-toggle-snap').addEventListener('click', () => {
@@ -1185,13 +1172,6 @@ function initToolbar() {
 		if (e.key === 'Enter') {
 			e.preventDefault();
 			projectNameEl.blur();
-		}
-	});
-
-	// Close path button
-	document.getElementById('btn-close-path').addEventListener('click', () => {
-		if (window.atelierModules?.patronEditor) {
-			window.atelierModules.patronEditor.closePath();
 		}
 	});
 
