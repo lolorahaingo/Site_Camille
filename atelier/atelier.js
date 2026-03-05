@@ -78,6 +78,7 @@ function initCanvas() {
 	state.canvas.on('mouse:down', handleMouseDown);
 	state.canvas.on('mouse:move', handleMouseMove);
 	state.canvas.on('mouse:up', handleMouseUp);
+	state.canvas.on('mouse:dblclick', handleMouseDblClick);
 	state.canvas.on('selection:created', handleSelectionChange);
 	state.canvas.on('selection:updated', handleSelectionChange);
 	state.canvas.on('selection:cleared', handleSelectionCleared);
@@ -383,6 +384,15 @@ function handleMouseUp(opt) {
 function handleSelectionChange(opt) {
 	updatePropertiesPanel(opt.selected);
 
+	// Show dimension labels on selected patron
+	const pe = window.atelierModules?.patronEditor;
+	if (pe && !pe.editMode.active) {
+		pe.clearSelectionLabels();
+		if (opt.selected && opt.selected.length === 1 && opt.selected[0]._isPatron) {
+			pe.showSelectionLabels(opt.selected[0]);
+		}
+	}
+
 	// Delegate to placement engine
 	if (window.atelierModules?.placementEngine) {
 		window.atelierModules.placementEngine.handleSelectionChange(opt);
@@ -391,6 +401,16 @@ function handleSelectionChange(opt) {
 
 function handleSelectionCleared() {
 	clearPropertiesPanel();
+
+	// Clear dimension labels
+	const pe = window.atelierModules?.patronEditor;
+	if (pe) {
+		pe.clearSelectionLabels();
+		// If in edit mode and user clicks empty space, exit edit mode
+		if (pe.editMode.active) {
+			pe.exitEditMode();
+		}
+	}
 }
 
 function handleObjectModified(opt) {
@@ -403,8 +423,33 @@ function handleObjectModified(opt) {
 }
 
 function handleObjectMoving(opt) {
+	// Edit mode: handle vertex/CP dragging
+	if (opt.target && (opt.target._isEditVertex || opt.target._isEditCP)) {
+		if (window.atelierModules?.patronEditor) {
+			window.atelierModules.patronEditor.handleEditModeDrag(opt.target);
+		}
+		return;
+	}
+
 	if (window.atelierModules?.placementEngine) {
 		window.atelierModules.placementEngine.handleObjectMoving(opt);
+	}
+}
+
+function handleMouseDblClick(opt) {
+	const target = opt.target;
+	const pe = window.atelierModules?.patronEditor;
+	if (!pe) return;
+
+	if (target && target._isPatron && !pe.editMode.active) {
+		// Enter edit mode on the patron
+		pe.clearSelectionLabels();
+		pe.enterEditMode(target);
+	} else if (pe.editMode.active) {
+		// Double-click elsewhere or on non-patron → exit edit mode
+		if (!target || (!target._isEditVertex && !target._isEditCP)) {
+			pe.exitEditMode();
+		}
 	}
 }
 
@@ -423,7 +468,12 @@ function handleContextMenu(opt) {
 	menu.className = 'context-menu';
 	menu.id = 'context-menu';
 
-	if (target && !target._isGrid) {
+	if (target && target._isEditVertex) {
+		// Edit mode: right-click on a vertex
+		menu.innerHTML = `
+			<div class="context-menu__item context-menu__item--danger" data-action="delete-vertex" data-vertex-index="${target._vertexIndex}">Supprimer le point <span class="context-menu__shortcut">Suppr</span></div>
+		`;
+	} else if (target && !target._isGrid && !target._isEditSegment && !target._isEditCP) {
 		menu.innerHTML = `
 			<div class="context-menu__item" data-action="duplicate">Dupliquer <span class="context-menu__shortcut">Ctrl+D</span></div>
 			<div class="context-menu__item" data-action="bring-front">Mettre devant</div>
@@ -446,8 +496,17 @@ function handleContextMenu(opt) {
 
 	// Handle clicks
 	menu.addEventListener('click', (ev) => {
-		const action = ev.target.closest('[data-action]')?.dataset.action;
-		if (action) handleContextAction(action, target);
+		const item = ev.target.closest('[data-action]');
+		if (!item) return;
+		const action = item.dataset.action;
+		if (action === 'delete-vertex') {
+			const idx = parseInt(item.dataset.vertexIndex, 10);
+			if (window.atelierModules?.patronEditor) {
+				window.atelierModules.patronEditor.deleteEditVertex(idx);
+			}
+		} else if (action) {
+			handleContextAction(action, target);
+		}
 		removeContextMenu();
 	});
 
@@ -494,6 +553,14 @@ function handleContextAction(action, target) {
 function setActiveTool(tool) {
 	state.activeTool = tool;
 
+	// Exit edit mode when switching away from select
+	if (tool !== 'select') {
+		const pe = window.atelierModules?.patronEditor;
+		if (pe && pe.editMode.active) {
+			pe.exitEditMode();
+		}
+	}
+
 	// Update toolbar buttons
 	document.querySelectorAll('.toolbar__btn[data-tool]').forEach(btn => {
 		btn.classList.toggle('active', btn.dataset.tool === tool);
@@ -506,7 +573,15 @@ function setActiveTool(tool) {
 	// Configure canvas selection
 	state.canvas.selection = (tool === 'select');
 	state.canvas.forEachObject(obj => {
-		if (!obj._isGrid && !obj._isBackground) {
+		if (obj._isGrid || obj._isBackground || obj._isDimensionLabel || obj._isEditSegment) {
+			// These objects are never user-selectable
+			return;
+		}
+		if (obj._isEditVertex || obj._isEditCP) {
+			// Edit handles must stay interactive while edit mode is active (tool is always 'select' then)
+			obj.selectable = (tool === 'select');
+			obj.evented = (tool === 'select');
+		} else {
 			obj.selectable = (tool === 'select');
 			obj.evented = (tool === 'select');
 		}
@@ -530,7 +605,7 @@ function updateCanvasCursor() {
 // History (Undo/Redo)
 // ============================================================
 function saveHistoryState() {
-	const json = state.canvas.toJSON(['_isGrid', '_isBackground', '_isPatron', '_isStrip', '_patronId', '_stripData', 'excludeFromExport']);
+	const json = state.canvas.toJSON(['_isGrid', '_isBackground', '_isPatron', '_isStrip', '_patronId', '_patronName', '_patronVertices', '_patronSegments', '_stripData', 'excludeFromExport']);
 
 	// Remove future states if we're not at the end
 	if (state.historyIndex < state.history.length - 1) {
@@ -750,7 +825,7 @@ function zoomOut() {
 }
 
 function zoomToFit() {
-	const objects = state.canvas.getObjects().filter(o => !o._isGrid);
+	const objects = state.canvas.getObjects().filter(o => !o._isGrid && !o._isDimensionLabel);
 	if (objects.length === 0) {
 		state.canvas.setZoom(1);
 		const vpt = state.canvas.viewportTransform;
@@ -795,11 +870,16 @@ function deleteSelection() {
 	const active = state.canvas.getActiveObject();
 	if (!active) return;
 
+	// Never delete edit-mode handles or dimension labels through this path
+	const isProtected = obj =>
+		obj._isGrid || obj._isBackground || obj._isDimensionLabel ||
+		obj._isEditVertex || obj._isEditCP || obj._isEditSegment;
+
 	if (active.type === 'activeSelection') {
 		active.forEachObject(obj => {
-			if (!obj._isGrid && !obj._isBackground) state.canvas.remove(obj);
+			if (!isProtected(obj)) state.canvas.remove(obj);
 		});
-	} else if (!active._isGrid && !active._isBackground) {
+	} else if (!isProtected(active)) {
 		state.canvas.remove(active);
 	}
 
@@ -826,11 +906,15 @@ function duplicateSelection() {
 		state.canvas.setActiveObject(cloned);
 		state.canvas.renderAll();
 		saveHistoryState();
-	}, ['_isPatron', '_isStrip', '_patronId', '_stripData']);
+	}, ['_isPatron', '_isStrip', '_patronId', '_patronName', '_patronVertices', '_patronSegments', '_stripData']);
 }
 
 function selectAll() {
-	const objects = state.canvas.getObjects().filter(o => !o._isGrid && !o._isBackground && o.selectable);
+	const objects = state.canvas.getObjects().filter(o =>
+		!o._isGrid && !o._isBackground && !o._isDimensionLabel &&
+		!o._isEditVertex && !o._isEditCP && !o._isEditSegment &&
+		o.selectable
+	);
 	if (objects.length === 0) return;
 
 	const selection = new fabric.ActiveSelection(objects, { canvas: state.canvas });
@@ -846,7 +930,7 @@ function saveProject() {
 	const data = {
 		name,
 		date: new Date().toISOString(),
-		canvas: state.canvas.toJSON(['_isGrid', '_isBackground', '_isPatron', '_isStrip', '_patronId', '_stripData', 'excludeFromExport']),
+		canvas: state.canvas.toJSON(['_isGrid', '_isBackground', '_isPatron', '_isStrip', '_patronId', '_patronName', '_patronVertices', '_patronSegments', '_stripData', 'excludeFromExport']),
 		zoom: state.zoom,
 	};
 
@@ -1072,6 +1156,16 @@ function initKeyboardShortcuts() {
 		// Delete
 		if (e.key === 'Delete' || e.key === 'Backspace') {
 			e.preventDefault();
+			// In edit mode, only delete a selected vertex — never fall through to deleteSelection
+			const pe = window.atelierModules?.patronEditor;
+			if (pe && pe.editMode.active) {
+				const active = state.canvas.getActiveObject();
+				if (active && active._isEditVertex) {
+					pe.deleteEditVertex(active._vertexIndex);
+				}
+				// No-op for any other key press while in edit mode
+				return;
+			}
 			deleteSelection();
 		}
 
@@ -1080,10 +1174,16 @@ function initKeyboardShortcuts() {
 		if (e.key === '-') zoomOut();
 		if (e.key === '0' && !ctrl) zoomToFit();
 
-		// Escape — park the current drawing (don't delete it)
+		// Escape — exit edit mode, or park the current drawing
 		if (e.key === 'Escape') {
+			e.preventDefault();
 			if (window.atelierModules?.patronEditor) {
-				window.atelierModules.patronEditor.parkDrawing();
+				const pe = window.atelierModules.patronEditor;
+				if (pe.editMode?.active) {
+					pe.exitEditMode();
+				} else {
+					pe.parkDrawing();
+				}
 			}
 			setActiveTool('select');
 			removeContextMenu();
