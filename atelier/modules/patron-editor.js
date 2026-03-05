@@ -1141,9 +1141,9 @@ export class PatronEditor {
 			return { type: s.type };
 		});
 
-		// Hide the patron
-		patronObj.set({ visible: false, selectable: false, evented: false });
+		// Remove the patron from canvas during editing (re-created on exit)
 		this.canvas.discardActiveObject();
+		this.canvas.remove(patronObj);
 
 		// Create the patron edit record
 		const patronIdx = this.editMode.patrons.length;
@@ -1300,7 +1300,7 @@ export class PatronEditor {
 				transparentCorners: false, borderColor: '#4a90d9',
 			});
 
-			this.canvas.remove(record.patronObj);
+			// patronObj was already removed from canvas when entering edit mode
 			this.canvas.add(newPatron);
 		}
 
@@ -1332,8 +1332,10 @@ export class PatronEditor {
 			record.vertices[vIdx] = { x: target.left, y: target.top };
 
 			const n = record.vertices.length;
-			this._updateEditSegment(record, (vIdx - 1 + n) % n);
-			this._updateEditSegment(record, vIdx);
+			this._updateEditSegmentQuiet(record, (vIdx - 1 + n) % n);
+			this._updateEditSegmentQuiet(record, vIdx);
+			this._bringEditHandlesToFront();
+			this.canvas.requestRenderAll();
 		}
 
 		if (target._isEditCP) {
@@ -1343,11 +1345,14 @@ export class PatronEditor {
 			if (!record) return;
 
 			record.segments[sIdx].cp = { x: target.left, y: target.top };
-			this._updateEditSegment(record, sIdx);
+			this._updateEditSegmentQuiet(record, sIdx);
+			this._bringEditHandlesToFront();
+			this.canvas.requestRenderAll();
 		}
 	}
 
-	_updateEditSegment(record, segIdx) {
+	// Update a segment's fabric objects without triggering render (caller renders)
+	_updateEditSegmentQuiet(record, segIdx) {
 		const n = record.vertices.length;
 		const from = record.vertices[segIdx];
 		const to = record.vertices[(segIdx + 1) % n];
@@ -1385,9 +1390,6 @@ export class PatronEditor {
 		this.canvas.add(newLabel);
 		seg.obj = newObj;
 		seg.label = newLabel;
-
-		this._bringEditHandlesToFront();
-		this.canvas.renderAll();
 	}
 
 	// Merge two patrons in edit mode by connecting a vertex from each.
@@ -1466,8 +1468,7 @@ export class PatronEditor {
 		this.canvas.add(closeLabel);
 		r1.segments.push({ type: 'L', obj: closeObj, label: closeLabel, cp: null, cpHandle: null });
 
-		// Remove r2's original patron object
-		this.canvas.remove(r2.patronObj);
+		// r2's patron object was already removed from canvas when entering edit mode
 
 		// Update r1's patron name
 		r1.patronObj._patronName = (r1.patronObj._patronName || 'Patron') + ' (fusionné)';
