@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Atelier &mdash; Placement de peaux</title>
+	<meta name="description" content="Outil de placement de peaux de fourrure sur patron">
+	<meta name="robots" content="noindex, nofollow">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="atelier.css">
+</head>
+<body>
+
+	<div id="app">
+
+		<!-- Top bar -->
+		<header id="app-header">
+			<div class="app-header__left">
+				<h1 class="app-header__title">Atelier</h1>
+				<span class="app-header__subtitle">Placement de peaux</span>
+			</div>
+			<div class="app-header__center">
+				<div class="app-header__project-name" contenteditable="true" spellcheck="false" title="Cliquer pour renommer le projet">Nouveau projet</div>
+			</div>
+			<div class="app-header__right">
+				<button id="btn-new" class="app-header__btn" title="Nouveau projet">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+				</button>
+				<button id="btn-save" class="app-header__btn" title="Sauvegarder (Ctrl+S)">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+				</button>
+				<button id="btn-load" class="app-header__btn" title="Charger un projet">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+				</button>
+				<button id="btn-export" class="app-header__btn" title="Exporter en PNG">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+				</button>
+				<span class="app-header__separator"></span>
+				<button id="btn-undo" class="app-header__btn" title="Annuler (Ctrl+Z)" disabled>
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+				</button>
+				<button id="btn-redo" class="app-header__btn" title="Rétablir (Ctrl+Shift+Z)" disabled>
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"/></svg>
+				</button>
+			</div>
+		</header>
+
+		<!-- Main content area -->
+		<div id="app-body">
+
+			<!-- Left toolbar -->
+			<aside id="toolbar">
+				<div class="toolbar__section">
+					<button class="toolbar__btn active" data-tool="select" title="Sélection (V)">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>
+						<span class="toolbar__label">Sélection</span>
+					</button>
+					<button class="toolbar__btn" data-tool="pan" title="Déplacer la vue (Espace)">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V5a2 2 0 0 0-4 0v9"/><path d="M18 11a2 2 0 0 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 17"/></svg>
+						<span class="toolbar__label">Déplacer</span>
+					</button>
+				</div>
+
+				<div class="toolbar__divider"></div>
+
+				<div class="toolbar__section">
+					<button class="toolbar__btn" data-tool="line" title="Ligne droite (L)">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="19" x2="19" y2="5"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/></svg>
+						<span class="toolbar__label">Ligne</span>
+					</button>
+					<button class="toolbar__btn" data-tool="curve" title="Courbe de Bézier (C)">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 17c4-8 14-8 18 0"/><circle cx="3" cy="17" r="2"/><circle cx="21" cy="17" r="2"/><circle cx="8" cy="7" r="1.5"/><circle cx="16" cy="7" r="1.5"/><line x1="3" y1="17" x2="8" y2="7" stroke-dasharray="3 3"/><line x1="21" y1="17" x2="16" y2="7" stroke-dasharray="3 3"/></svg>
+						<span class="toolbar__label">Courbe</span>
+					</button>
+					<button class="toolbar__btn" data-tool="arc" title="Arc (A)">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 20 A16 16 0 0 1 20 20"/><circle cx="4" cy="20" r="2"/><circle cx="20" cy="20" r="2"/></svg>
+						<span class="toolbar__label">Arc</span>
+					</button>
+					<button class="toolbar__btn" data-tool="rect" title="Rectangle (R)">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="0"/></svg>
+						<span class="toolbar__label">Rectangle</span>
+					</button>
+				</div>
+
+				<div class="toolbar__divider"></div>
+
+				<div class="toolbar__section">
+					<button class="toolbar__btn" id="btn-close-path" title="Fermer le contour" disabled>
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="5 3 19 3 22 21 2 21"/></svg>
+						<span class="toolbar__label">Fermer</span>
+					</button>
+					<button class="toolbar__btn" id="btn-import-image" title="Importer une photo">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+						<span class="toolbar__label">Photo</span>
+					</button>
+				</div>
+
+				<div class="toolbar__divider"></div>
+
+				<div class="toolbar__section">
+					<button class="toolbar__btn" id="btn-toggle-grid" title="Afficher/Masquer la grille (G)">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="3" x2="3" y2="21"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="21" y1="3" x2="21" y2="21"/><line x1="3" y1="3" x2="21" y2="3"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="3" y1="21" x2="21" y2="21"/></svg>
+						<span class="toolbar__label">Grille</span>
+					</button>
+					<button class="toolbar__btn" id="btn-toggle-snap" title="Accrochage magnétique">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 12a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-7z"/><path d="M14 5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V5z"/><line x1="10" y1="15" x2="14" y2="9"/></svg>
+						<span class="toolbar__label">Aimant</span>
+					</button>
+				</div>
+
+				<div class="toolbar__spacer"></div>
+
+				<div class="toolbar__section">
+					<button class="toolbar__btn" id="btn-zoom-in" title="Zoom + (+)">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+						<span class="toolbar__label">Zoom +</span>
+					</button>
+					<button class="toolbar__btn" id="btn-zoom-out" title="Zoom - (-)">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+						<span class="toolbar__label">Zoom -</span>
+					</button>
+					<button class="toolbar__btn" id="btn-zoom-fit" title="Ajuster à la vue (0)">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+						<span class="toolbar__label">Ajuster</span>
+					</button>
+				</div>
+
+				<div class="toolbar__section">
+					<button class="toolbar__btn" id="btn-help" title="Aide & raccourcis (?)">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+						<span class="toolbar__label">Aide</span>
+					</button>
+				</div>
+			</aside>
+
+			<!-- Canvas area -->
+			<main id="canvas-area">
+				<!-- Horizontal ruler -->
+				<div id="ruler-horizontal" class="ruler ruler--horizontal"></div>
+				<!-- Vertical ruler -->
+				<div id="ruler-vertical" class="ruler ruler--vertical"></div>
+				<!-- Ruler corner -->
+				<div id="ruler-corner" class="ruler__corner">cm</div>
+				<!-- Canvas container -->
+				<div id="canvas-container">
+					<canvas id="main-canvas"></canvas>
+				</div>
+				<!-- Status bar -->
+				<div id="status-bar">
+					<span id="status-cursor">X: 0.0 cm &nbsp; Y: 0.0 cm</span>
+					<span id="status-zoom">100%</span>
+					<span id="status-info"></span>
+				</div>
+			</main>
+
+			<!-- Right panel -->
+			<aside id="panel">
+				<!-- Properties section -->
+				<div class="panel__section" id="section-properties">
+					<div class="panel__header" data-toggle="properties">
+						<h3>Propriétés</h3>
+						<svg class="panel__chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+					</div>
+					<div class="panel__content" id="content-properties">
+						<p class="panel__empty">Sélectionnez un élément</p>
+					</div>
+				</div>
+
+				<!-- Pelts section -->
+				<div class="panel__section" id="section-pelts">
+					<div class="panel__header" data-toggle="pelts">
+						<h3>Peaux</h3>
+						<svg class="panel__chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+					</div>
+					<div class="panel__content" id="content-pelts">
+						<div class="panel__field">
+							<label for="pelt-type">Type de fourrure</label>
+							<select id="pelt-type"></select>
+						</div>
+						<div class="panel__field">
+							<label for="pelt-size">Taille</label>
+							<select id="pelt-size"></select>
+						</div>
+						<div class="panel__field-row">
+							<div class="panel__field">
+								<label for="strip-width">Largeur bande (mm)</label>
+								<input type="number" id="strip-width" min="1" max="200" step="0.5">
+							</div>
+							<div class="panel__field">
+								<label for="strip-length">Longueur (cm)</label>
+								<input type="number" id="strip-length" min="1" max="200" step="0.5">
+							</div>
+						</div>
+						<div class="panel__field-row">
+							<div class="panel__field">
+								<label for="strip-count">Nombre</label>
+								<input type="number" id="strip-count" value="1" min="1" max="50" step="1">
+							</div>
+							<div class="panel__field">
+								<button id="btn-add-strips" class="panel__btn">Ajouter</button>
+							</div>
+						</div>
+						<div id="pelt-color-preview" class="panel__color-preview"></div>
+					</div>
+				</div>
+
+				<!-- Image overlay section -->
+				<div class="panel__section" id="section-image">
+					<div class="panel__header" data-toggle="image">
+						<h3>Calque photo</h3>
+						<svg class="panel__chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+					</div>
+					<div class="panel__content panel__content--collapsed" id="content-image">
+						<div class="panel__field">
+							<label for="image-opacity">Opacité</label>
+							<input type="range" id="image-opacity" min="0" max="100" value="30">
+							<span id="image-opacity-value">30%</span>
+						</div>
+						<div class="panel__field">
+							<label>Échelle</label>
+							<p class="panel__hint">Tracez une ligne sur la photo puis indiquez la mesure réelle pour calibrer l'échelle.</p>
+							<button id="btn-calibrate" class="panel__btn panel__btn--secondary">Calibrer l'échelle</button>
+						</div>
+						<div class="panel__field">
+							<label>
+								<input type="checkbox" id="image-lock" checked> Verrouiller le calque
+							</label>
+						</div>
+					</div>
+				</div>
+
+				<!-- Statistics section -->
+				<div class="panel__section" id="section-stats">
+					<div class="panel__header" data-toggle="stats">
+						<h3>Statistiques</h3>
+						<svg class="panel__chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+					</div>
+					<div class="panel__content" id="content-stats">
+						<div class="stats__grid">
+							<div class="stats__item">
+								<span class="stats__label">Surface patron</span>
+								<span class="stats__value" id="stat-patron-area">— cm²</span>
+							</div>
+							<div class="stats__item">
+								<span class="stats__label">Surface couverte</span>
+								<span class="stats__value" id="stat-covered-area">— cm²</span>
+							</div>
+							<div class="stats__item">
+								<span class="stats__label">Chute</span>
+								<span class="stats__value" id="stat-waste-area">— cm²</span>
+							</div>
+							<div class="stats__item stats__item--highlight">
+								<span class="stats__label">% de chute</span>
+								<span class="stats__value" id="stat-waste-pct">— %</span>
+							</div>
+							<div class="stats__progress">
+								<div class="stats__progress-bar" id="stat-progress-bar"></div>
+							</div>
+							<div class="stats__item">
+								<span class="stats__label">Bandes placées</span>
+								<span class="stats__value" id="stat-strip-count">0</span>
+							</div>
+							<div class="stats__item">
+								<span class="stats__label">Peaux nécessaires</span>
+								<span class="stats__value" id="stat-pelt-count">0</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</aside>
+
+		</div><!-- /app-body -->
+
+	</div><!-- /app -->
+
+	<!-- Help modal -->
+	<div id="help-modal" class="modal" hidden>
+		<div class="modal__backdrop"></div>
+		<div class="modal__content">
+			<div class="modal__header">
+				<h2>Raccourcis clavier</h2>
+				<button class="modal__close">&times;</button>
+			</div>
+			<div class="modal__body">
+				<div class="shortcuts__grid">
+					<div class="shortcuts__group">
+						<h4>Outils</h4>
+						<div class="shortcut"><kbd>V</kbd> Sélection</div>
+						<div class="shortcut"><kbd>L</kbd> Ligne droite</div>
+						<div class="shortcut"><kbd>C</kbd> Courbe de Bézier</div>
+						<div class="shortcut"><kbd>A</kbd> Arc</div>
+						<div class="shortcut"><kbd>R</kbd> Rectangle</div>
+						<div class="shortcut"><kbd>G</kbd> Grille</div>
+						<div class="shortcut"><kbd>Espace</kbd> Déplacer la vue</div>
+					</div>
+					<div class="shortcuts__group">
+						<h4>Édition</h4>
+						<div class="shortcut"><kbd>Ctrl+Z</kbd> Annuler</div>
+						<div class="shortcut"><kbd>Ctrl+Shift+Z</kbd> Rétablir</div>
+						<div class="shortcut"><kbd>Ctrl+D</kbd> Dupliquer</div>
+						<div class="shortcut"><kbd>Ctrl+A</kbd> Tout sélectionner</div>
+						<div class="shortcut"><kbd>Ctrl+S</kbd> Sauvegarder</div>
+						<div class="shortcut"><kbd>Suppr</kbd> Supprimer</div>
+						<div class="shortcut"><kbd>Échap</kbd> Annuler le tracé</div>
+					</div>
+					<div class="shortcuts__group">
+						<h4>Vue</h4>
+						<div class="shortcut"><kbd>+</kbd> Zoom avant</div>
+						<div class="shortcut"><kbd>-</kbd> Zoom arrière</div>
+						<div class="shortcut"><kbd>0</kbd> Ajuster à la vue</div>
+						<div class="shortcut"><kbd>Molette</kbd> Zoom</div>
+						<div class="shortcut"><kbd>Shift</kbd> Contraindre (0°/45°/90°)</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Load modal (project list) -->
+	<div id="load-modal" class="modal" hidden>
+		<div class="modal__backdrop"></div>
+		<div class="modal__content">
+			<div class="modal__header">
+				<h2>Charger un projet</h2>
+				<button class="modal__close">&times;</button>
+			</div>
+			<div class="modal__body">
+				<div id="project-list" class="project-list">
+					<p class="panel__empty">Aucun projet sauvegardé</p>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Hidden file input for image import -->
+	<input type="file" id="image-input" accept="image/*" hidden>
+
+	<!-- Fabric.js -->
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+
+	<!-- App modules -->
+	<script type="module" src="atelier.js"></script>
+
+</body>
+</html>
