@@ -76,7 +76,7 @@ export class PeltManager {
 			document.getElementById('pelt-color-preview').style.background = this.currentPelt.color;
 			
 			// Update default strip width
-			document.getElementById('strip-width').value = this.currentPelt.defaultStripWidth_mm;
+			document.getElementById('strip-width').value = this.currentPelt.defaultStripWidth_cm;
 		}
 	}
 	
@@ -94,17 +94,17 @@ export class PeltManager {
 	// Strip Creation
 	// ============================================================
 	addStrips() {
-		const stripWidthMm = parseFloat(document.getElementById('strip-width').value);
+		const stripWidthCm = parseFloat(document.getElementById('strip-width').value);
 		const stripLengthCm = parseFloat(document.getElementById('strip-length').value);
 		const count = parseInt(document.getElementById('strip-count').value) || 1;
 		
-		if (isNaN(stripWidthMm) || isNaN(stripLengthCm) || stripWidthMm <= 0 || stripLengthCm <= 0) {
+		if (isNaN(stripWidthCm) || isNaN(stripLengthCm) || stripWidthCm <= 0 || stripLengthCm <= 0) {
 			showToast('Veuillez entrer des dimensions valides');
 			return;
 		}
 		
 		// Convert to pixels
-		const widthPx = (stripWidthMm / 10) * this.state.pxPerCm; // mm to cm to px
+		const widthPx = stripWidthCm * this.state.pxPerCm;
 		const lengthPx = stripLengthCm * this.state.pxPerCm;
 		
 		// Find a good starting position (near center of visible area)
@@ -133,7 +133,7 @@ export class PeltManager {
 				color: peltColor,
 				peltName: peltName,
 				sizeName: sizeName,
-				stripWidthMm: stripWidthMm,
+				stripWidthCm: stripWidthCm,
 				stripLengthCm: stripLengthCm,
 			});
 			
@@ -152,7 +152,7 @@ export class PeltManager {
 		}
 	}
 	
-	createStrip({ x, y, width, height, color, peltName, sizeName, stripWidthMm, stripLengthCm }) {
+	createStrip({ x, y, width, height, color, peltName, sizeName, stripWidthCm, stripLengthCm }) {
 		// Create the strip rectangle
 		const strip = new fabric.Rect({
 			left: x,
@@ -168,7 +168,7 @@ export class PeltManager {
 			_stripData: {
 				peltName,
 				sizeName,
-				stripWidthMm,
+				stripWidthCm,
 				stripLengthCm,
 				color,
 			},

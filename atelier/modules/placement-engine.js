@@ -398,8 +398,9 @@ export class PlacementEngine {
 					
 				// Calculate how many strips fit per pelt
 				// A pelt has width_cm and length_cm. Strips are cut from it.
-				// Number of strips = floor(pelt_length_cm / strip_width_cm)
-				peltCounts[key].perPelt = Math.max(1, Math.floor((data.stripLengthCm || 50) / (data.stripWidthMm / 10)));
+				// Number of strips per pelt = floor(pelt_width / strip_width)
+				// Here stripWidthCm is the band width, stripLengthCm is the pelt length
+				peltCounts[key].perPelt = Math.max(1, Math.floor((data.stripLengthCm || 50) / (data.stripWidthCm || 15)));
 				}
 				peltCounts[key].count++;
 			}

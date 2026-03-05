@@ -1,78 +1,125 @@
 [
   {
-    "id": "mink",
-    "name": "Vison",
+    "id": "mink_male",
+    "name": "Vison (Mâle)",
     "sizes": [
-      { "label": "000 (Triple Zéro)", "length_cm": 52, "width_cm": 8.5 },
-      { "label": "00 (Double Zéro)", "length_cm": 56, "width_cm": 9.5 },
       { "label": "0 (Zéro)", "length_cm": 60, "width_cm": 10.5 },
-      { "label": "1", "length_cm": 63.5, "width_cm": 11.5 },
-      { "label": "2", "length_cm": 67.5, "width_cm": 12.5 },
-      { "label": "3", "length_cm": 72.5, "width_cm": 13.5 },
-      { "label": "4", "length_cm": 77.5, "width_cm": 14.5 },
+      { "label": "1", "length_cm": 63, "width_cm": 11.5 },
+      { "label": "2", "length_cm": 67, "width_cm": 12.5 },
+      { "label": "3", "length_cm": 72, "width_cm": 13.5 },
+      { "label": "4", "length_cm": 77, "width_cm": 14.5 },
       { "label": "5 (Jumbo)", "length_cm": 82, "width_cm": 15.5 }
     ],
-    "defaultStripWidth_mm": 4,
+    "defaultStripWidth_cm": 13,
     "color": "#8B7355"
   },
   {
-    "id": "fox",
-    "name": "Renard",
+    "id": "mink_female",
+    "name": "Vison (Femelle)",
     "sizes": [
-      { "label": "Petit", "length_cm": 85, "width_cm": 27 },
-      { "label": "Moyen", "length_cm": 95, "width_cm": 32 },
-      { "label": "Grand", "length_cm": 105, "width_cm": 37 },
-      { "label": "Très Grand", "length_cm": 115, "width_cm": 42 },
-      { "label": "Super", "length_cm": 125, "width_cm": 47 }
+      { "label": "000 (Triple Zéro)", "length_cm": 48, "width_cm": 8 },
+      { "label": "00 (Double Zéro)", "length_cm": 52, "width_cm": 9 },
+      { "label": "0 (Zéro)", "length_cm": 56, "width_cm": 10 },
+      { "label": "1", "length_cm": 60, "width_cm": 11 },
+      { "label": "2", "length_cm": 62, "width_cm": 12 }
     ],
-    "defaultStripWidth_mm": 7,
+    "defaultStripWidth_cm": 10,
+    "color": "#7A6548"
+  },
+  {
+    "id": "fox_blue",
+    "name": "Renard Bleu (Blue Fox)",
+    "sizes": [
+      { "label": "Petit", "length_cm": 80, "width_cm": 25 },
+      { "label": "Moyen", "length_cm": 90, "width_cm": 30 },
+      { "label": "Grand", "length_cm": 100, "width_cm": 33 },
+      { "label": "Très Grand", "length_cm": 110, "width_cm": 35 }
+    ],
+    "defaultStripWidth_cm": 20,
+    "color": "#B0C4D8"
+  },
+  {
+    "id": "fox_silver",
+    "name": "Renard Argenté (Silver Fox)",
+    "sizes": [
+      { "label": "Petit", "length_cm": 90, "width_cm": 20 },
+      { "label": "Moyen", "length_cm": 100, "width_cm": 25 },
+      { "label": "Grand", "length_cm": 110, "width_cm": 28 },
+      { "label": "Très Grand", "length_cm": 120, "width_cm": 30 }
+    ],
+    "defaultStripWidth_cm": 18,
+    "color": "#A0A0A0"
+  },
+  {
+    "id": "fox_red",
+    "name": "Renard Roux (Red Fox)",
+    "sizes": [
+      { "label": "Petit", "length_cm": 85, "width_cm": 20 },
+      { "label": "Moyen", "length_cm": 95, "width_cm": 24 },
+      { "label": "Grand", "length_cm": 105, "width_cm": 27 },
+      { "label": "Très Grand", "length_cm": 115, "width_cm": 30 }
+    ],
+    "defaultStripWidth_cm": 18,
     "color": "#C4956A"
   },
   {
     "id": "chinchilla",
     "name": "Chinchilla",
     "sizes": [
-      { "label": "Petit", "length_cm": 20, "width_cm": 13 },
-      { "label": "Moyen", "length_cm": 24, "width_cm": 15.5 },
-      { "label": "Grand", "length_cm": 28, "width_cm": 18.5 },
-      { "label": "Très Grand", "length_cm": 31, "width_cm": 21 }
+      { "label": "Petit", "length_cm": 25, "width_cm": 12 },
+      { "label": "Moyen", "length_cm": 30, "width_cm": 15 },
+      { "label": "Grand", "length_cm": 33, "width_cm": 17 },
+      { "label": "Très Grand", "length_cm": 35, "width_cm": 18 }
     ],
-    "defaultStripWidth_mm": 12,
+    "defaultStripWidth_cm": 10,
     "color": "#A8A8B0"
   },
   {
-    "id": "sable",
-    "name": "Zibeline",
+    "id": "sable_male",
+    "name": "Zibeline (Mâle)",
     "sizes": [
-      { "label": "Petit", "length_cm": 34, "width_cm": 11 },
-      { "label": "Moyen", "length_cm": 41, "width_cm": 13.5 },
-      { "label": "Grand", "length_cm": 48, "width_cm": 16.5 },
-      { "label": "Très Grand", "length_cm": 55, "width_cm": 19 }
+      { "label": "Petit", "length_cm": 45, "width_cm": 10 },
+      { "label": "Moyen", "length_cm": 52, "width_cm": 13 },
+      { "label": "Grand", "length_cm": 58, "width_cm": 15 },
+      { "label": "Très Grand (Bargouzine)", "length_cm": 65, "width_cm": 16 }
     ],
-    "defaultStripWidth_mm": 5,
+    "defaultStripWidth_cm": 13,
     "color": "#4A3728"
+  },
+  {
+    "id": "sable_female",
+    "name": "Zibeline (Femelle)",
+    "sizes": [
+      { "label": "Petit", "length_cm": 38, "width_cm": 8 },
+      { "label": "Moyen", "length_cm": 44, "width_cm": 10 },
+      { "label": "Grand", "length_cm": 50, "width_cm": 12 },
+      { "label": "Très Grand", "length_cm": 55, "width_cm": 13 }
+    ],
+    "defaultStripWidth_cm": 10,
+    "color": "#5C4A3A"
   },
   {
     "id": "rex_rabbit",
     "name": "Lapin Rex",
     "sizes": [
-      { "label": "Petit", "length_cm": 32, "width_cm": 22 },
-      { "label": "Moyen", "length_cm": 37, "width_cm": 27 },
-      { "label": "Grand", "length_cm": 42, "width_cm": 32 },
-      { "label": "Très Grand", "length_cm": 50, "width_cm": 37 }
+      { "label": "Petit", "length_cm": 35, "width_cm": 25 },
+      { "label": "Moyen", "length_cm": 40, "width_cm": 30 },
+      { "label": "Grand", "length_cm": 45, "width_cm": 33 },
+      { "label": "Très Grand", "length_cm": 50, "width_cm": 35 }
     ],
-    "defaultStripWidth_mm": 7,
+    "defaultStripWidth_cm": 15,
     "color": "#D2C6B5"
   },
   {
     "id": "finnraccoon",
-    "name": "Finnraccoon",
+    "name": "Finnraccoon (Viverrin)",
     "sizes": [
-      { "label": "Moyen", "length_cm": 75, "width_cm": 30 },
-      { "label": "Grand", "length_cm": 85, "width_cm": 35 },
-      { "label": "Très Grand", "length_cm": 95, "width_cm": 40 }
+      { "label": "Moyen", "length_cm": 75, "width_cm": 25 },
+      { "label": "Grand", "length_cm": 85, "width_cm": 32 },
+      { "label": "Très Grand", "length_cm": 95, "width_cm": 38 },
+      { "label": "Super", "length_cm": 100, "width_cm": 40 }
     ],
-    "defaultStripWidth_mm": 7,
+    "defaultStripWidth_cm": 20,
     "color": "#9E8E7E"
   },
   {
@@ -83,8 +130,19 @@
       { "label": "Moyen", "length_cm": 37, "width_cm": 30 },
       { "label": "Grand", "length_cm": 43, "width_cm": 34 }
     ],
-    "defaultStripWidth_mm": 10,
+    "defaultStripWidth_cm": 15,
     "color": "#1A1A1A"
+  },
+  {
+    "id": "broadtail",
+    "name": "Broadtail (Karakulcha)",
+    "sizes": [
+      { "label": "Petit", "length_cm": 25, "width_cm": 20 },
+      { "label": "Moyen", "length_cm": 30, "width_cm": 25 },
+      { "label": "Grand", "length_cm": 35, "width_cm": 30 }
+    ],
+    "defaultStripWidth_cm": 15,
+    "color": "#2A2A2A"
   },
   {
     "id": "custom",
@@ -92,7 +150,7 @@
     "sizes": [
       { "label": "Personnalisé", "length_cm": 50, "width_cm": 15 }
     ],
-    "defaultStripWidth_mm": 5,
+    "defaultStripWidth_cm": 15,
     "color": "#888888"
   }
 ]
