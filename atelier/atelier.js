@@ -334,9 +334,16 @@ function handleMouseDown(opt) {
 		return;
 	}
 
+	// Merge mode: intercept click to pick target vertex
+	const pe = window.atelierModules?.patronEditor;
+	if (pe && pe._mergeSource) {
+		const target = state.canvas.findTarget(opt.e);
+		if (pe.handleMergeClick(target)) return;
+	}
+
 	// Delegate to active tool module
-	if (window.atelierModules?.patronEditor) {
-		window.atelierModules.patronEditor.handleMouseDown(opt);
+	if (pe) {
+		pe.handleMouseDown(opt);
 	}
 }
 
@@ -402,14 +409,10 @@ function handleSelectionChange(opt) {
 function handleSelectionCleared() {
 	clearPropertiesPanel();
 
-	// Clear dimension labels
+	// Clear dimension labels (but don't exit edit mode — that's done via Escape or double-click)
 	const pe = window.atelierModules?.patronEditor;
-	if (pe) {
+	if (pe && !pe.editMode.active) {
 		pe.clearSelectionLabels();
-		// If in edit mode and user clicks empty space, exit edit mode
-		if (pe.editMode.active) {
-			pe.exitEditMode();
-		}
 	}
 }
 
@@ -441,13 +444,13 @@ function handleMouseDblClick(opt) {
 	const pe = window.atelierModules?.patronEditor;
 	if (!pe) return;
 
-	if (target && target._isPatron && !pe.editMode.active) {
-		// Enter edit mode on the patron
+	if (target && target._isPatron) {
+		// Add this patron to the edit session (enterEditMode is additive)
 		pe.clearSelectionLabels();
 		pe.enterEditMode(target);
 	} else if (pe.editMode.active) {
-		// Double-click elsewhere or on non-patron → exit edit mode
-		if (!target || (!target._isEditVertex && !target._isEditCP)) {
+		// Double-click on empty space or non-patron/non-edit object → exit edit mode
+		if (!target || (!target._isEditVertex && !target._isEditCP && !target._isEditSegment)) {
 			pe.exitEditMode();
 		}
 	}
@@ -470,9 +473,15 @@ function handleContextMenu(opt) {
 
 	if (target && target._isEditVertex) {
 		// Edit mode: right-click on a vertex
-		menu.innerHTML = `
-			<div class="context-menu__item context-menu__item--danger" data-action="delete-vertex" data-vertex-index="${target._vertexIndex}">Supprimer le point <span class="context-menu__shortcut">Suppr</span></div>
-		`;
+		const pe = window.atelierModules?.patronEditor;
+		const multiPatron = pe && pe.editMode.patrons.length > 1;
+		let items = '';
+		if (multiPatron) {
+			items += `<div class="context-menu__item" data-action="merge-patrons" data-patron-index="${target._patronIndex}" data-vertex-index="${target._vertexIndex}">Connecter à un autre patron</div>
+			<div class="context-menu__divider"></div>`;
+		}
+		items += `<div class="context-menu__item context-menu__item--danger" data-action="delete-vertex" data-patron-index="${target._patronIndex}" data-vertex-index="${target._vertexIndex}">Supprimer le point <span class="context-menu__shortcut">Suppr</span></div>`;
+		menu.innerHTML = items;
 	} else if (target && !target._isGrid && !target._isEditSegment && !target._isEditCP) {
 		menu.innerHTML = `
 			<div class="context-menu__item" data-action="duplicate">Dupliquer <span class="context-menu__shortcut">Ctrl+D</span></div>
@@ -499,10 +508,17 @@ function handleContextMenu(opt) {
 		const item = ev.target.closest('[data-action]');
 		if (!item) return;
 		const action = item.dataset.action;
-		if (action === 'delete-vertex') {
-			const idx = parseInt(item.dataset.vertexIndex, 10);
+		if (action === 'merge-patrons') {
+			const pIdx = parseInt(item.dataset.patronIndex, 10);
+			const vIdx = parseInt(item.dataset.vertexIndex, 10);
 			if (window.atelierModules?.patronEditor) {
-				window.atelierModules.patronEditor.deleteEditVertex(idx);
+				window.atelierModules.patronEditor.startMerge(pIdx, vIdx);
+			}
+		} else if (action === 'delete-vertex') {
+			const pIdx = parseInt(item.dataset.patronIndex, 10);
+			const vIdx = parseInt(item.dataset.vertexIndex, 10);
+			if (window.atelierModules?.patronEditor) {
+				window.atelierModules.patronEditor.deleteEditVertex(pIdx, vIdx);
 			}
 		} else if (action) {
 			handleContextAction(action, target);
@@ -573,12 +589,13 @@ function setActiveTool(tool) {
 	// Configure canvas selection
 	state.canvas.selection = (tool === 'select');
 	state.canvas.forEachObject(obj => {
-		if (obj._isGrid || obj._isBackground || obj._isDimensionLabel || obj._isEditSegment) {
-			// These objects are never user-selectable
+		// These objects are NEVER user-selectable
+		if (obj._isGrid || obj._isBackground || obj._isDimensionLabel ||
+			obj._isEditSegment || obj._isAnchor || obj._isPathSegment) {
 			return;
 		}
+		// Edit handles are selectable only in select mode
 		if (obj._isEditVertex || obj._isEditCP) {
-			// Edit handles must stay interactive while edit mode is active (tool is always 'select' then)
 			obj.selectable = (tool === 'select');
 			obj.evented = (tool === 'select');
 		} else {
@@ -870,10 +887,11 @@ function deleteSelection() {
 	const active = state.canvas.getActiveObject();
 	if (!active) return;
 
-	// Never delete edit-mode handles or dimension labels through this path
+	// Never delete internal objects through this path
 	const isProtected = obj =>
 		obj._isGrid || obj._isBackground || obj._isDimensionLabel ||
-		obj._isEditVertex || obj._isEditCP || obj._isEditSegment;
+		obj._isEditVertex || obj._isEditCP || obj._isEditSegment ||
+		obj._isAnchor || obj._isPathSegment;
 
 	if (active.type === 'activeSelection') {
 		active.forEachObject(obj => {
@@ -913,6 +931,7 @@ function selectAll() {
 	const objects = state.canvas.getObjects().filter(o =>
 		!o._isGrid && !o._isBackground && !o._isDimensionLabel &&
 		!o._isEditVertex && !o._isEditCP && !o._isEditSegment &&
+		!o._isAnchor && !o._isPathSegment &&
 		o.selectable
 	);
 	if (objects.length === 0) return;
@@ -1161,9 +1180,8 @@ function initKeyboardShortcuts() {
 			if (pe && pe.editMode.active) {
 				const active = state.canvas.getActiveObject();
 				if (active && active._isEditVertex) {
-					pe.deleteEditVertex(active._vertexIndex);
+					pe.deleteEditVertex(active._patronIndex, active._vertexIndex);
 				}
-				// No-op for any other key press while in edit mode
 				return;
 			}
 			deleteSelection();
@@ -1179,7 +1197,9 @@ function initKeyboardShortcuts() {
 			e.preventDefault();
 			if (window.atelierModules?.patronEditor) {
 				const pe = window.atelierModules.patronEditor;
-				if (pe.editMode?.active) {
+				if (pe._mergeSource) {
+					pe._cancelMerge();
+				} else if (pe.editMode?.active) {
 					pe.exitEditMode();
 				} else {
 					pe.parkDrawing();

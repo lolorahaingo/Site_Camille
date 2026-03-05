@@ -231,20 +231,42 @@ class OpenContour {
 		this.labels.forEach(l => this.canvas.remove(l));
 	}
 
-	// Merge another contour onto the END of this one
+	// Merge another contour onto the END of this one.
+	// Creates a connecting segment from this.endPoint to other.startPoint.
 	mergeAtEnd(other) {
-		// other.startPoint should be ≈ this.endPoint
-		// Skip the first point of other (it's the shared point)
-		for (let i = 1; i < other.points.length; i++) {
+		const from = this.endPoint;
+		const to = other.startPoint;
+
+		// Create a connecting line segment between the two endpoints
+		const zoom = this.canvas.getZoom();
+		const connectLine = new fabric.Line([from.x, from.y, to.x, to.y], {
+			stroke: '#333',
+			strokeWidth: 2 / zoom,
+			selectable: false,
+			evented: false,
+			_isPathSegment: true,
+			_contourId: this.id,
+		});
+		this.canvas.add(connectLine);
+		this.segments.push(connectLine);
+
+		// Add a dimension label for the connecting segment
+		const pxPerCm = this.state.pxPerCm;
+		const lengthCm = dist(from, to) / pxPerCm;
+		const offset = 12 / zoom;
+		const lPos = labelPosition(from, to, offset);
+		const label = makeDimensionLabel(this.canvas, lengthCm.toFixed(1) + ' cm', lPos, zoom);
+		this.canvas.add(label);
+		this.labels.push(label);
+
+		// Append ALL of other's points (including the first — it's a distinct point)
+		for (let i = 0; i < other.points.length; i++) {
 			this.points.push(other.points[i]);
 		}
 		this.segments.push(...other.segments);
 		this.labels.push(...other.labels);
-		// Remove other's first anchor (duplicate), keep the rest
-		if (other.anchors.length > 0) {
-			this.canvas.remove(other.anchors[0]);
-		}
-		for (let i = 1; i < other.anchors.length; i++) {
+		// Keep all of other's anchors
+		for (let i = 0; i < other.anchors.length; i++) {
 			this.anchors.push(other.anchors[i]);
 		}
 		this._refreshEndpointStyles();
@@ -303,15 +325,18 @@ export class PatronEditor {
 		// Patron counter
 		this.patronCount = 0;
 
-		// Edit mode state
+		// Edit mode state — supports multiple patrons simultaneously
 		this.editMode = {
 			active: false,
-			patronObj: null,           // the original fabric.Path being edited
-			vertices: [],              // {x, y}[] — world coordinates
-			segments: [],              // {type:'L'|'Q', obj: fabric.Line|Path, label: fabric.Text, cp?: {x,y}}[]
-			handles: [],               // fabric.Circle vertex handles
-			cpHandles: [],             // fabric.Circle control-point handles (for Q segments)
+			// Each entry: { patronObj, vertices[], segments[], handles[], cpHandles[] }
+			patrons: [],
+			// Flat lookup for quick access during drag
+			_allHandles: [],    // all vertex handles across all patrons
+			_allCPHandles: [],  // all CP handles across all patrons
 		};
+
+		// Merge mode: waiting for user to click a target vertex from another patron
+		this._mergeSource = null; // { patronIndex, vertexIndex } or null
 
 		// Selection dimension labels (shown when patron is selected but not in edit mode)
 		this._selectionLabels = [];
@@ -1068,12 +1093,16 @@ export class PatronEditor {
 	}
 
 	// ============================================================
-	// EDIT MODE — vertex editing of closed patrons
+	// EDIT MODE — vertex editing of closed patrons (multi-patron)
 	// ============================================================
 
+	// Add a patron to the current edit session (or start one)
 	enterEditMode(patronObj) {
-		if (this.editMode.active) this.exitEditMode();
 		this.parkDrawing();
+		this.clearSelectionLabels();
+
+		// Check if this patron is already being edited
+		if (this.editMode.patrons.some(p => p.patronObj === patronObj)) return;
 
 		// Get vertices and segments from patron metadata
 		let vertices = patronObj._patronVertices;
@@ -1091,14 +1120,12 @@ export class PatronEditor {
 			return;
 		}
 
-		// Transform vertices from patron-local to world coordinates.
-		// pathOffset is an internal Fabric.js v5 property; guard against it being absent.
+		// Transform vertices from patron-local to world coordinates
 		const matrix = patronObj.calcTransformMatrix();
 		const po = patronObj.pathOffset || { x: 0, y: 0 };
 		const worldVertices = vertices.map(v => {
 			const pt = fabric.util.transformPoint(
-				new fabric.Point(v.x - po.x, v.y - po.y),
-				matrix
+				new fabric.Point(v.x - po.x, v.y - po.y), matrix
 			);
 			return { x: pt.x, y: pt.y };
 		});
@@ -1107,8 +1134,7 @@ export class PatronEditor {
 		const worldSegments = segmentsMeta.map(s => {
 			if (s.type === 'Q' && s.cp) {
 				const pt = fabric.util.transformPoint(
-					new fabric.Point(s.cp.x - po.x, s.cp.y - po.y),
-					matrix
+					new fabric.Point(s.cp.x - po.x, s.cp.y - po.y), matrix
 				);
 				return { type: 'Q', cp: { x: pt.x, y: pt.y } };
 			}
@@ -1119,13 +1145,15 @@ export class PatronEditor {
 		patronObj.set({ visible: false, selectable: false, evented: false });
 		this.canvas.discardActiveObject();
 
-		// Store edit state
-		this.editMode.active = true;
-		this.editMode.patronObj = patronObj;
-		this.editMode.vertices = worldVertices;
-		this.editMode.handles = [];
-		this.editMode.cpHandles = [];
-		this.editMode.segments = [];
+		// Create the patron edit record
+		const patronIdx = this.editMode.patrons.length;
+		const record = {
+			patronObj,
+			vertices: worldVertices,
+			segments: [],
+			handles: [],
+			cpHandles: [],
+		};
 
 		const zoom = this.canvas.getZoom();
 
@@ -1133,173 +1161,158 @@ export class PatronEditor {
 		for (let i = 0; i < worldVertices.length; i++) {
 			const v = worldVertices[i];
 			const handle = new fabric.Circle({
-				left: v.x,
-				top: v.y,
+				left: v.x, top: v.y,
 				radius: 6 / zoom,
-				originX: 'center',
-				originY: 'center',
-				fill: '#4a90d9',
-				stroke: '#fff',
+				originX: 'center', originY: 'center',
+				fill: '#4a90d9', stroke: '#fff',
 				strokeWidth: 2 / zoom,
-				selectable: true,
-				evented: true,
-				hasBorders: false,
-				hasControls: false,
+				selectable: true, evented: true,
+				hasBorders: false, hasControls: false,
 				_isEditVertex: true,
+				_patronIndex: patronIdx,
 				_vertexIndex: i,
-				hoverCursor: 'move',
-				moveCursor: 'move',
+				hoverCursor: 'move', moveCursor: 'move',
 			});
 			this.canvas.add(handle);
-			this.editMode.handles.push(handle);
+			record.handles.push(handle);
 		}
 
-		// Create segments and labels, plus control-point handles for curves
+		// Create segments, labels, and CP handles
 		for (let i = 0; i < worldSegments.length; i++) {
 			const from = worldVertices[i];
 			const to = worldVertices[(i + 1) % worldVertices.length];
 			const sMeta = worldSegments[i];
 
 			let segObj, label, cpHandle = null;
+			const offset = 12 / zoom;
 
 			if (sMeta.type === 'Q' && sMeta.cp) {
-				// Quadratic Bézier
 				const pathStr = `M ${from.x} ${from.y} Q ${sMeta.cp.x} ${sMeta.cp.y} ${to.x} ${to.y}`;
 				segObj = new fabric.Path(pathStr, {
 					fill: '', stroke: '#4a90d9', strokeWidth: 1.5 / zoom,
 					selectable: false, evented: false, _isEditSegment: true,
 				});
-
-				// Control point handle
 				cpHandle = new fabric.Circle({
-					left: sMeta.cp.x,
-					top: sMeta.cp.y,
+					left: sMeta.cp.x, top: sMeta.cp.y,
 					radius: 5 / zoom,
-					originX: 'center',
-					originY: 'center',
-					fill: '#e74c3c',
-					stroke: '#fff',
+					originX: 'center', originY: 'center',
+					fill: '#e74c3c', stroke: '#fff',
 					strokeWidth: 1.5 / zoom,
-					selectable: true,
-					evented: true,
-					hasBorders: false,
-					hasControls: false,
+					selectable: true, evented: true,
+					hasBorders: false, hasControls: false,
 					_isEditCP: true,
+					_patronIndex: patronIdx,
 					_segmentIndex: i,
-					hoverCursor: 'move',
-					moveCursor: 'move',
+					hoverCursor: 'move', moveCursor: 'move',
 				});
 				this.canvas.add(cpHandle);
-				this.editMode.cpHandles.push(cpHandle);
+				record.cpHandles.push(cpHandle);
 
-				// Label
 				const lengthCm = bezierLength(from, sMeta.cp, to) / this.state.pxPerCm;
 				const mid = bezierMidpoint(from, sMeta.cp, to);
-				const offset = 12 / zoom;
 				const lPos = labelPosition(from, to, offset);
 				lPos.x = mid.x + (lPos.x - (from.x + to.x) / 2);
 				lPos.y = mid.y + (lPos.y - (from.y + to.y) / 2);
 				label = makeDimensionLabel(this.canvas, lengthCm.toFixed(1) + ' cm', lPos, zoom);
 			} else {
-				// Line segment
 				segObj = new fabric.Line([from.x, from.y, to.x, to.y], {
 					stroke: '#4a90d9', strokeWidth: 1.5 / zoom,
 					selectable: false, evented: false, _isEditSegment: true,
 				});
-
-				// Label
 				const lengthCm = dist(from, to) / this.state.pxPerCm;
-				const offset = 12 / zoom;
 				const lPos = labelPosition(from, to, offset);
 				label = makeDimensionLabel(this.canvas, lengthCm.toFixed(1) + ' cm', lPos, zoom);
 			}
 
 			this.canvas.add(segObj);
 			this.canvas.add(label);
-			this.editMode.segments.push({
-				type: sMeta.type,
-				obj: segObj,
-				label: label,
-				cp: sMeta.cp ? { x: sMeta.cp.x, y: sMeta.cp.y } : null,
-				cpHandle: cpHandle,
+			record.segments.push({
+				type: sMeta.type, obj: segObj, label,
+				cp: sMeta.cp ? { ...sMeta.cp } : null,
+				cpHandle,
 			});
 		}
 
-		// Bring handles to front
-		this.editMode.handles.forEach(h => this.canvas.bringToFront(h));
-		this.editMode.cpHandles.forEach(h => this.canvas.bringToFront(h));
+		// Add record
+		this.editMode.patrons.push(record);
+		this.editMode.active = true;
+		this._rebuildEditHandleLookups();
 
+		// Bring all handles to front
+		this._bringEditHandlesToFront();
 		this.canvas.renderAll();
+
+		const count = this.editMode.patrons.length;
 		document.getElementById('status-info').textContent =
-			'Mode édition — Déplacez les points pour modifier le patron. Échap pour quitter.';
+			count === 1
+				? 'Mode édition — Déplacez les points. Double-cliquez un autre patron pour l\'ajouter. Échap pour quitter.'
+				: `Mode édition — ${count} patrons. Déplacez les points. Échap pour quitter.`;
 	}
 
 	exitEditMode() {
 		if (!this.editMode.active) return;
+		this._mergeSource = null;
 
 		const em = this.editMode;
-		const patronObj = em.patronObj;
 
-		// Read current vertex positions from handles
-		const newVertices = em.handles.map(h => ({ x: h.left, y: h.top }));
+		// Rebuild each patron from its current edit state
+		for (const record of em.patrons) {
+			const newVertices = record.handles.map(h => ({ x: h.left, y: h.top }));
+			const newSegments = record.segments.map(s => {
+				if (s.type === 'Q' && s.cpHandle) {
+					return { type: 'Q', cp: { x: s.cpHandle.left, y: s.cpHandle.top } };
+				}
+				return { type: s.type };
+			});
 
-		// Read current control points from segment state
-		const newSegments = em.segments.map(s => {
-			if (s.type === 'Q' && s.cpHandle) {
-				return { type: 'Q', cp: { x: s.cpHandle.left, y: s.cpHandle.top } };
+			// Build SVG path
+			let pathStr = `M ${newVertices[0].x} ${newVertices[0].y}`;
+			for (let i = 0; i < newSegments.length; i++) {
+				const to = newVertices[(i + 1) % newVertices.length];
+				if (newSegments[i].type === 'Q' && newSegments[i].cp) {
+					pathStr += ` Q ${newSegments[i].cp.x} ${newSegments[i].cp.y} ${to.x} ${to.y}`;
+				} else {
+					pathStr += ` L ${to.x} ${to.y}`;
+				}
 			}
-			return { type: s.type };
-		});
+			pathStr += ' Z';
 
-		// Build new SVG path string
-		let pathStr = `M ${newVertices[0].x} ${newVertices[0].y}`;
-		for (let i = 0; i < newSegments.length; i++) {
-			const to = newVertices[(i + 1) % newVertices.length];
-			if (newSegments[i].type === 'Q' && newSegments[i].cp) {
-				pathStr += ` Q ${newSegments[i].cp.x} ${newSegments[i].cp.y} ${to.x} ${to.y}`;
-			} else {
-				pathStr += ` L ${to.x} ${to.y}`;
-			}
+			// Remove edit objects
+			record.handles.forEach(h => this.canvas.remove(h));
+			record.cpHandles.forEach(h => this.canvas.remove(h));
+			record.segments.forEach(s => {
+				this.canvas.remove(s.obj);
+				this.canvas.remove(s.label);
+			});
+
+			// Create new patron
+			const newPatron = new fabric.Path(pathStr, {
+				fill: record.patronObj.fill || 'rgba(100, 149, 237, 0.1)',
+				stroke: record.patronObj.stroke || '#4a90d9',
+				strokeWidth: record.patronObj.strokeWidth,
+				selectable: true, evented: true,
+				_isPatron: true,
+				_patronId: record.patronObj._patronId,
+				_patronName: record.patronObj._patronName,
+				_patronVertices: newVertices,
+				_patronSegments: newSegments,
+				cornerColor: '#4a90d9', cornerStyle: 'circle', cornerSize: 8,
+				transparentCorners: false, borderColor: '#4a90d9',
+			});
+
+			this.canvas.remove(record.patronObj);
+			this.canvas.add(newPatron);
 		}
-		pathStr += ' Z';
-
-		// Remove all edit objects from canvas
-		em.handles.forEach(h => this.canvas.remove(h));
-		em.cpHandles.forEach(h => this.canvas.remove(h));
-		em.segments.forEach(s => {
-			this.canvas.remove(s.obj);
-			this.canvas.remove(s.label);
-		});
-
-		// Replace the patron with a new Path at identity transform
-		const newPatron = new fabric.Path(pathStr, {
-			fill: patronObj.fill,
-			stroke: patronObj.stroke,
-			strokeWidth: patronObj.strokeWidth,
-			selectable: true, evented: true,
-			_isPatron: true,
-			_patronId: patronObj._patronId,
-			_patronName: patronObj._patronName,
-			_patronVertices: newVertices,
-			_patronSegments: newSegments,
-			cornerColor: '#4a90d9', cornerStyle: 'circle', cornerSize: 8,
-			transparentCorners: false, borderColor: '#4a90d9',
-		});
-
-		this.canvas.remove(patronObj);
-		this.canvas.add(newPatron);
-		this.canvas.setActiveObject(newPatron);
 
 		// Reset edit state
 		this.editMode = {
 			active: false,
-			patronObj: null,
-			vertices: [],
-			segments: [],
-			handles: [],
-			cpHandles: [],
+			patrons: [],
+			_allHandles: [],
+			_allCPHandles: [],
 		};
 
+		this.canvas.discardActiveObject();
 		this.canvas.renderAll();
 		saveHistoryState();
 		if (window.atelierModules?.stats) window.atelierModules.stats.update();
@@ -1310,40 +1323,38 @@ export class PatronEditor {
 	handleEditModeDrag(target) {
 		if (!this.editMode.active) return;
 
-		const em = this.editMode;
-		const zoom = this.canvas.getZoom();
-
 		if (target._isEditVertex) {
-			const idx = target._vertexIndex;
-			em.vertices[idx] = { x: target.left, y: target.top };
+			const pIdx = target._patronIndex;
+			const vIdx = target._vertexIndex;
+			const record = this.editMode.patrons[pIdx];
+			if (!record) return;
 
-			// Update the two segments adjacent to this vertex
-			// Segment idx-1 ends at this vertex, segment idx starts at this vertex
-			const n = em.vertices.length;
-			const prevSegIdx = (idx - 1 + n) % n;
-			const nextSegIdx = idx;
+			record.vertices[vIdx] = { x: target.left, y: target.top };
 
-			this._updateEditSegment(prevSegIdx);
-			this._updateEditSegment(nextSegIdx);
+			const n = record.vertices.length;
+			this._updateEditSegment(record, (vIdx - 1 + n) % n);
+			this._updateEditSegment(record, vIdx);
 		}
 
 		if (target._isEditCP) {
-			const segIdx = target._segmentIndex;
-			em.segments[segIdx].cp = { x: target.left, y: target.top };
-			this._updateEditSegment(segIdx);
+			const pIdx = target._patronIndex;
+			const sIdx = target._segmentIndex;
+			const record = this.editMode.patrons[pIdx];
+			if (!record) return;
+
+			record.segments[sIdx].cp = { x: target.left, y: target.top };
+			this._updateEditSegment(record, sIdx);
 		}
 	}
 
-	_updateEditSegment(segIdx) {
-		const em = this.editMode;
-		const n = em.vertices.length;
-		const from = em.vertices[segIdx];
-		const to = em.vertices[(segIdx + 1) % n];
-		const seg = em.segments[segIdx];
+	_updateEditSegment(record, segIdx) {
+		const n = record.vertices.length;
+		const from = record.vertices[segIdx];
+		const to = record.vertices[(segIdx + 1) % n];
+		const seg = record.segments[segIdx];
 		const zoom = this.canvas.getZoom();
 		const offset = 12 / zoom;
 
-		// Remove old segment and label
 		this.canvas.remove(seg.obj);
 		this.canvas.remove(seg.label);
 
@@ -1370,70 +1381,213 @@ export class PatronEditor {
 		}
 
 		const newLabel = makeDimensionLabel(this.canvas, lengthCm.toFixed(1) + ' cm', lPos, zoom);
-
 		this.canvas.add(newObj);
 		this.canvas.add(newLabel);
 		seg.obj = newObj;
 		seg.label = newLabel;
 
-		// Bring handles to front so they stay on top
-		em.handles.forEach(h => this.canvas.bringToFront(h));
-		em.cpHandles.forEach(h => this.canvas.bringToFront(h));
-
+		this._bringEditHandlesToFront();
 		this.canvas.renderAll();
 	}
 
-	// Delete a vertex in edit mode
-	deleteEditVertex(index) {
+	// Merge two patrons in edit mode by connecting a vertex from each.
+	// pIdx1/vIdx1 — the "seam" vertex on the first patron.
+	// pIdx2/vIdx2 — the "seam" vertex on the second patron.
+	// NOTE: No UI trigger is wired yet. This method is ready for use once
+	// a "merge vertices" interaction (e.g. drag-snap or toolbar button) is added.
+	mergeEditPatrons(pIdx1, vIdx1, pIdx2, vIdx2) {
 		const em = this.editMode;
-		if (em.vertices.length <= 3) {
+		const r1 = em.patrons[pIdx1];
+		const r2 = em.patrons[pIdx2];
+		if (!r1 || !r2) return;
+
+		const zoom = this.canvas.getZoom();
+		const offset = 12 / zoom;
+
+		// Remove the closing segments of both patrons (the segment from last vertex back to first).
+		// We'll reconnect them as one open polygon, then close it.
+
+		// Strategy: "open" both polygons at the selected vertices, concatenate, close.
+		// Rotate r1's arrays so vIdx1 is the last vertex.
+		// Rotate r2's arrays so vIdx2 is the first vertex.
+		this._rotateRecord(r1, (vIdx1 + 1) % r1.vertices.length);
+		this._rotateRecord(r2, vIdx2);
+
+		// Now r1 ends at the connection point, r2 starts at the connection point.
+		// Remove the closing segment of r1 (last segment: from last vertex back to first).
+		const closingSeg1 = r1.segments.pop();
+		this.canvas.remove(closingSeg1.obj);
+		this.canvas.remove(closingSeg1.label);
+		if (closingSeg1.cpHandle) {
+			this.canvas.remove(closingSeg1.cpHandle);
+			r1.cpHandles = r1.cpHandles.filter(h => h !== closingSeg1.cpHandle);
+		}
+
+		// Remove the closing segment of r2
+		const closingSeg2 = r2.segments.pop();
+		this.canvas.remove(closingSeg2.obj);
+		this.canvas.remove(closingSeg2.label);
+		if (closingSeg2.cpHandle) {
+			this.canvas.remove(closingSeg2.cpHandle);
+			r2.cpHandles = r2.cpHandles.filter(h => h !== closingSeg2.cpHandle);
+		}
+
+		// Create connecting segment from r1's last vertex to r2's first vertex
+		const from1 = r1.vertices[r1.vertices.length - 1];
+		const to2 = r2.vertices[0];
+		const connectObj1 = new fabric.Line([from1.x, from1.y, to2.x, to2.y], {
+			stroke: '#4a90d9', strokeWidth: 1.5 / zoom,
+			selectable: false, evented: false, _isEditSegment: true,
+		});
+		const connectLen1 = dist(from1, to2) / this.state.pxPerCm;
+		const connectLPos1 = labelPosition(from1, to2, offset);
+		const connectLabel1 = makeDimensionLabel(this.canvas, connectLen1.toFixed(1) + ' cm', connectLPos1, zoom);
+		this.canvas.add(connectObj1);
+		this.canvas.add(connectLabel1);
+		r1.segments.push({ type: 'L', obj: connectObj1, label: connectLabel1, cp: null, cpHandle: null });
+
+		// Append r2's data to r1
+		r1.vertices.push(...r2.vertices);
+		r1.segments.push(...r2.segments);
+		r1.handles.push(...r2.handles);
+		r1.cpHandles.push(...r2.cpHandles);
+
+		// Create closing segment from r2's last vertex back to r1's first vertex
+		const fromLast = r1.vertices[r1.vertices.length - 1];
+		const toFirst = r1.vertices[0];
+		const closeObj = new fabric.Line([fromLast.x, fromLast.y, toFirst.x, toFirst.y], {
+			stroke: '#4a90d9', strokeWidth: 1.5 / zoom,
+			selectable: false, evented: false, _isEditSegment: true,
+		});
+		const closeLen = dist(fromLast, toFirst) / this.state.pxPerCm;
+		const closeLPos = labelPosition(fromLast, toFirst, offset);
+		const closeLabel = makeDimensionLabel(this.canvas, closeLen.toFixed(1) + ' cm', closeLPos, zoom);
+		this.canvas.add(closeObj);
+		this.canvas.add(closeLabel);
+		r1.segments.push({ type: 'L', obj: closeObj, label: closeLabel, cp: null, cpHandle: null });
+
+		// Remove r2's original patron object
+		this.canvas.remove(r2.patronObj);
+
+		// Update r1's patron name
+		r1.patronObj._patronName = (r1.patronObj._patronName || 'Patron') + ' (fusionné)';
+
+		// Remove r2 from patrons array
+		em.patrons.splice(pIdx2, 1);
+
+		// Re-index all handles
+		this._reindexAllHandles();
+		this._rebuildEditHandleLookups();
+		this._bringEditHandlesToFront();
+		this.canvas.renderAll();
+
+		const count = em.patrons.length;
+		showToast('Patrons fusionnés');
+		document.getElementById('status-info').textContent =
+			`Mode édition — ${count} patron${count > 1 ? 's' : ''}. Déplacez les points. Échap pour quitter.`;
+	}
+
+	// Start merge: user selected a source vertex, now waiting for target
+	startMerge(patronIndex, vertexIndex) {
+		this._mergeSource = { patronIndex, vertexIndex };
+		// Highlight the source vertex
+		const record = this.editMode.patrons[patronIndex];
+		if (record && record.handles[vertexIndex]) {
+			record.handles[vertexIndex].set({ fill: '#2ecc71', radius: 9 / this.canvas.getZoom() });
+			this.canvas.renderAll();
+		}
+		document.getElementById('status-info').textContent =
+			'Cliquez sur un point d\'un autre patron pour connecter les deux patrons.';
+	}
+
+	// Handle click during merge mode
+	handleMergeClick(target) {
+		if (!this._mergeSource) return false;
+		if (!target || !target._isEditVertex) {
+			// Cancel merge
+			this._cancelMerge();
+			return true;
+		}
+
+		const src = this._mergeSource;
+		const dstPIdx = target._patronIndex;
+		const dstVIdx = target._vertexIndex;
+
+		if (dstPIdx === src.patronIndex) {
+			showToast('Sélectionnez un point d\'un autre patron');
+			return true;
+		}
+
+		// Reset source highlight
+		this._resetMergeHighlight();
+		this._mergeSource = null;
+
+		// Perform merge
+		this.mergeEditPatrons(src.patronIndex, src.vertexIndex, dstPIdx, dstVIdx);
+		return true;
+	}
+
+	_cancelMerge() {
+		this._resetMergeHighlight();
+		this._mergeSource = null;
+		document.getElementById('status-info').textContent =
+			'Mode édition — Déplacez les points. Échap pour quitter.';
+	}
+
+	_resetMergeHighlight() {
+		if (!this._mergeSource) return;
+		const record = this.editMode.patrons[this._mergeSource.patronIndex];
+		if (record && record.handles[this._mergeSource.vertexIndex]) {
+			const zoom = this.canvas.getZoom();
+			record.handles[this._mergeSource.vertexIndex].set({
+				fill: '#4a90d9', radius: 6 / zoom,
+			});
+			this.canvas.renderAll();
+		}
+	}
+
+	// Delete a vertex in edit mode
+	deleteEditVertex(patronIndex, vertexIndex) {
+		const record = this.editMode.patrons[patronIndex];
+		if (!record) return;
+
+		if (record.vertices.length <= 3) {
 			showToast('Impossible de supprimer : minimum 3 points');
 			return;
 		}
 
-		const n = em.vertices.length;
-		// prevSegIdx: segment ending AT index (from vertex index-1 to index)
-		// nextSegIdx: segment starting AT index (from vertex index to index+1)
-		const prevSegIdx = (index - 1 + n) % n;
-		const nextSegIdx = index;
+		const n = record.vertices.length;
+		const prevSegIdx = (vertexIndex - 1 + n) % n;
+		const nextSegIdx = vertexIndex;
+		const fromVertexIdx = (vertexIndex - 1 + n) % n;
+		const toVertexIdx = (vertexIndex + 1) % n;
 
-		// The two neighbor vertex indices that will be connected by the new segment
-		const fromVertexIdx = (index - 1 + n) % n;
-		const toVertexIdx = (index + 1) % n;
+		// Remove vertex handle
+		this.canvas.remove(record.handles[vertexIndex]);
+		record.handles.splice(vertexIndex, 1);
+		record.vertices.splice(vertexIndex, 1);
 
-		// Remove the vertex handle
-		this.canvas.remove(em.handles[index]);
-		em.handles.splice(index, 1);
-		em.vertices.splice(index, 1);
-
-		// Remove the two adjacent segments (and their labels, CP handles).
-		// Sort descending so splicing the higher index first doesn't shift the lower one.
+		// Remove two adjacent segments (descending order to preserve indices)
 		const segsToRemove = [prevSegIdx, nextSegIdx].sort((a, b) => b - a);
 		for (const si of segsToRemove) {
-			const seg = em.segments[si];
+			const seg = record.segments[si];
 			this.canvas.remove(seg.obj);
 			this.canvas.remove(seg.label);
 			if (seg.cpHandle) {
 				this.canvas.remove(seg.cpHandle);
-				em.cpHandles = em.cpHandles.filter(h => h !== seg.cpHandle);
+				record.cpHandles = record.cpHandles.filter(h => h !== seg.cpHandle);
 			}
-			em.segments.splice(si, 1);
+			record.segments.splice(si, 1);
 		}
 
-		// After splicing vertices and segments, compute the adjusted neighbor indices.
-		// Vertices after splice: original indices > index are shifted down by 1.
-		const newN = em.vertices.length; // n - 1
-		const adjFrom = fromVertexIdx >= index ? fromVertexIdx - 1 : fromVertexIdx;
-		const adjTo = toVertexIdx > index ? toVertexIdx - 1 : toVertexIdx;
+		// Insert new bridging segment
+		const newN = record.vertices.length;
+		const adjFrom = fromVertexIdx >= vertexIndex ? fromVertexIdx - 1 : fromVertexIdx;
+		const adjTo = toVertexIdx > vertexIndex ? toVertexIdx - 1 : toVertexIdx;
+		const insertIdx = ((adjFrom % newN) + newN) % newN;
 
-		// The new segment at position i connects vertices[i] to vertices[(i+1)%newN].
-		// We need the segment that connects adjFrom → adjTo.
-		// That segment belongs at index adjFrom (since seg[i] goes from vertices[i] to vertices[i+1]).
-		// If adjFrom wraps (adjFrom === newN-1 and adjTo === 0), it goes at the end (index newN-1).
-		const insertIdx = adjFrom % newN;
-
-		const from = em.vertices[adjFrom % newN];
-		const to = em.vertices[adjTo % newN];
+		const from = record.vertices[insertIdx];
+		const to = record.vertices[(insertIdx + 1) % newN];
 		const zoom = this.canvas.getZoom();
 		const offset = 12 / zoom;
 
@@ -1447,22 +1601,58 @@ export class PatronEditor {
 
 		this.canvas.add(newObj);
 		this.canvas.add(newLabel);
-		em.segments.splice(insertIdx, 0, {
+		record.segments.splice(insertIdx, 0, {
 			type: 'L', obj: newObj, label: newLabel, cp: null, cpHandle: null,
 		});
 
-		// Re-index vertex handles
-		em.handles.forEach((h, i) => { h._vertexIndex = i; });
-		// Re-index CP handles
-		em.segments.forEach((s, i) => {
-			if (s.cpHandle) s.cpHandle._segmentIndex = i;
-		});
-
-		// Bring handles to front
-		em.handles.forEach(h => this.canvas.bringToFront(h));
-		em.cpHandles.forEach(h => this.canvas.bringToFront(h));
-
+		// Re-index
+		this._reindexAllHandles();
+		this._rebuildEditHandleLookups();
+		this._bringEditHandlesToFront();
 		this.canvas.renderAll();
+	}
+
+	// ---- Edit mode helpers ----
+
+	_rotateRecord(record, newStartIdx) {
+		if (newStartIdx === 0) return;
+		const n = record.vertices.length;
+		const idx = newStartIdx % n;
+		record.vertices = [...record.vertices.slice(idx), ...record.vertices.slice(0, idx)];
+		record.segments = [...record.segments.slice(idx), ...record.segments.slice(0, idx)];
+		record.handles  = [...record.handles.slice(idx),  ...record.handles.slice(0, idx)];
+		// Rebuild cpHandles in the new segment order so the flat array stays consistent
+		// with record.segments (used for bulk canvas operations and _reindexAllHandles).
+		record.cpHandles = record.segments.map(s => s.cpHandle).filter(Boolean);
+	}
+
+	_reindexAllHandles() {
+		this.editMode.patrons.forEach((record, pIdx) => {
+			record.handles.forEach((h, vIdx) => {
+				h._patronIndex = pIdx;
+				h._vertexIndex = vIdx;
+			});
+			record.cpHandles.forEach(h => {
+				h._patronIndex = pIdx;
+			});
+			record.segments.forEach((s, sIdx) => {
+				if (s.cpHandle) s.cpHandle._segmentIndex = sIdx;
+			});
+		});
+	}
+
+	_rebuildEditHandleLookups() {
+		this.editMode._allHandles = [];
+		this.editMode._allCPHandles = [];
+		for (const record of this.editMode.patrons) {
+			this.editMode._allHandles.push(...record.handles);
+			this.editMode._allCPHandles.push(...record.cpHandles);
+		}
+	}
+
+	_bringEditHandlesToFront() {
+		for (const h of this.editMode._allHandles) this.canvas.bringToFront(h);
+		for (const h of this.editMode._allCPHandles) this.canvas.bringToFront(h);
 	}
 
 	// Fallback: parse a fabric.Path's internal path data into vertices + segments
@@ -1487,8 +1677,6 @@ export class PatronEditor {
 					break;
 				case 'Z':
 				case 'z':
-					// Z closes the path: add the implicit closing segment (last vertex → first vertex).
-					// For a valid closed polygon, segments.length will equal vertices.length after this.
 					if (vertices.length >= 2) {
 						segments.push({ type: 'L' });
 					}
@@ -1524,21 +1712,17 @@ export class PatronEditor {
 			const toLocal = vertices[(i + 1) % vertices.length];
 			const sMeta = segmentsMeta[i];
 
-			// Transform to world coordinates
 			const from = fabric.util.transformPoint(
-				new fabric.Point(fromLocal.x - po.x, fromLocal.y - po.y),
-				matrix
+				new fabric.Point(fromLocal.x - po.x, fromLocal.y - po.y), matrix
 			);
 			const to = fabric.util.transformPoint(
-				new fabric.Point(toLocal.x - po.x, toLocal.y - po.y),
-				matrix
+				new fabric.Point(toLocal.x - po.x, toLocal.y - po.y), matrix
 			);
 
 			let lengthCm, lPos;
 			if (sMeta.type === 'Q' && sMeta.cp) {
 				const cpWorld = fabric.util.transformPoint(
-					new fabric.Point(sMeta.cp.x - po.x, sMeta.cp.y - po.y),
-					matrix
+					new fabric.Point(sMeta.cp.x - po.x, sMeta.cp.y - po.y), matrix
 				);
 				lengthCm = bezierLength(from, cpWorld, to) / this.state.pxPerCm;
 				const mid = bezierMidpoint(from, cpWorld, to);
