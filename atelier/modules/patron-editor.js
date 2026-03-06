@@ -136,8 +136,9 @@ class OpenContour {
 			stroke: '#4a90d9',
 			strokeWidth: 1.5 / zoom,
 			selectable: false,
-			evented: true, // Respond to right-click for context menu
+			evented: true,
 			hasBorders: false, hasControls: false,
+			lockMovementX: true, lockMovementY: true,
 			hoverCursor: 'default',
 			_isAnchor: true,
 			_contourId: this.id,

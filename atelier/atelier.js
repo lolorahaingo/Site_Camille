@@ -691,8 +691,10 @@ function setActiveTool(tool) {
 			obj.evented = (!locked && tool === 'select');
 			return;
 		}
-		// Interior anchors are never selectable; endpoint anchors are selectable in select mode
-		if (obj._isAnchor && !obj._isEndpointAnchor) {
+		// Anchors (interior + endpoint): selectable in select mode for deletion
+		if (obj._isAnchor) {
+			obj.selectable = (tool === 'select');
+			obj.evented = (tool === 'select') || obj.evented; // keep evented for right-click
 			return;
 		}
 		// Edit mode objects (vertices, segments, CP handles) are selectable in select mode
@@ -1700,37 +1702,53 @@ function initKeyboardShortcuts() {
 			e.preventDefault();
 			const pe = window.atelierModules?.patronEditor;
 			const active = state.canvas.getActiveObject();
+			if (!active) return;
 
-			// --- Edit mode: delete selected vertices/segments ---
-			if (pe && pe.editMode.active && active) {
-				let selected = [];
-				if (active.type === 'activeSelection') {
-					selected = active.getObjects().filter(o =>
-						o._isEditVertex || o._isEditSegment
-					);
-				} else if (active._isEditVertex || active._isEditSegment) {
-					selected = [active];
+			// Collect all selected objects (single or multi-selection)
+			const allSelected = active.type === 'activeSelection'
+				? active.getObjects()
+				: [active];
+
+			// Separate by type
+			const editObjects = allSelected.filter(o => o._isEditVertex || o._isEditSegment);
+			const contourAnchors = allSelected.filter(o => o._isAnchor && o._contourId);
+
+			// --- Edit mode objects (vertices/segments of patron in edit mode) ---
+			if (pe && editObjects.length > 0) {
+				state.canvas.discardActiveObject();
+				pe.deleteMultipleEditObjects(editObjects);
+				// Continue to also handle contour anchors if mixed selection
+			}
+
+			// --- Open contour anchors ---
+			if (pe && contourAnchors.length > 0) {
+				state.canvas.discardActiveObject();
+				// Group by contour, process each contour's points in reverse index order
+				const byContour = new Map();
+				for (const anchor of contourAnchors) {
+					const contour = pe.contours.find(c => c.id === anchor._contourId);
+					if (!contour) continue;
+					if (!byContour.has(contour)) byContour.set(contour, []);
+					// Find the point index for this anchor
+					const idx = contour.anchors.indexOf(anchor);
+					if (idx !== -1) byContour.get(contour).push(idx);
 				}
-				if (selected.length > 0) {
-					state.canvas.discardActiveObject();
-					pe.deleteMultipleEditObjects(selected);
-					state.canvas.renderAll();
-					saveHistoryState();
-					return;
+				for (const [contour, indices] of byContour) {
+					// Sort descending to avoid index shift issues
+					indices.sort((a, b) => b - a);
+					for (const ptIdx of indices) {
+						if (!pe.contours.includes(contour)) break; // contour was fully deleted
+						if (ptIdx >= contour.points.length) continue;
+						pe.deleteContourPoint(contour, ptIdx);
+					}
 				}
 			}
 
-			// --- Open contour: delete selected endpoint or anchor ---
-			if (pe && active && active._isEndpointAnchor && active._contourId) {
-				const contour = pe.contours.find(c => c.id === active._contourId);
-				if (contour) {
-					const ptIdx = active._endpointIndex === 0 ? 0 : contour.points.length - 1;
-					state.canvas.discardActiveObject();
-					pe.deleteContourPoint(contour, ptIdx);
-					state.canvas.renderAll();
-					saveHistoryState();
-					return;
-				}
+			// If we handled any edit/contour objects, save and return
+			if (editObjects.length > 0 || contourAnchors.length > 0) {
+				state.canvas.renderAll();
+				saveHistoryState();
+				return;
 			}
 
 			deleteSelection();
