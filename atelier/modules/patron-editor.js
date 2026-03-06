@@ -1260,6 +1260,78 @@ export class PatronEditor {
 				: `Mode édition — ${count} patrons. Déplacez les points. Échap pour quitter.`;
 	}
 
+	// Temporarily suspend edit mode for serialization:
+	// rebuilds patron Paths on canvas, removes edit handles, calls callback,
+	// then restores edit handles and removes temp patrons.
+	withEditModeSuspended(callback) {
+		if (!this.editMode.active) return callback();
+
+		const tempPatrons = [];
+
+		for (const record of this.editMode.patrons) {
+			const newVertices = record.handles.map(h => ({ x: h.left, y: h.top }));
+			const newSegments = record.segments.map(s => {
+				if (s.type === 'Q' && s.cpHandle) {
+					return { type: 'Q', cp: { x: s.cpHandle.left, y: s.cpHandle.top } };
+				}
+				return { type: s.type };
+			});
+
+			// Build SVG path
+			let pathStr = `M ${newVertices[0].x} ${newVertices[0].y}`;
+			for (let i = 0; i < newSegments.length; i++) {
+				const to = newVertices[(i + 1) % newVertices.length];
+				if (newSegments[i].type === 'Q' && newSegments[i].cp) {
+					pathStr += ` Q ${newSegments[i].cp.x} ${newSegments[i].cp.y} ${to.x} ${to.y}`;
+				} else {
+					pathStr += ` L ${to.x} ${to.y}`;
+				}
+			}
+			pathStr += ' Z';
+
+			// Hide edit handles
+			record.handles.forEach(h => this.canvas.remove(h));
+			record.cpHandles.forEach(h => this.canvas.remove(h));
+			record.segments.forEach(s => {
+				this.canvas.remove(s.obj);
+				this.canvas.remove(s.label);
+			});
+
+			// Add temporary patron Path
+			const tempPatron = new fabric.Path(pathStr, {
+				fill: record.patronObj.fill || 'rgba(100, 149, 237, 0.1)',
+				stroke: record.patronObj.stroke || '#4a90d9',
+				strokeWidth: record.patronObj.strokeWidth || 2 / this.canvas.getZoom(),
+				_isPatron: true,
+				_patronId: record.patronObj._patronId,
+				_patronName: record.patronObj._patronName,
+				_patronVertices: newVertices,
+				_patronSegments: newSegments,
+				selectable: false, evented: false,
+			});
+			this.canvas.add(tempPatron);
+			tempPatrons.push(tempPatron);
+		}
+
+		// Execute callback (serialization)
+		const result = callback();
+
+		// Restore edit mode: remove temp patrons, re-add edit handles
+		tempPatrons.forEach(p => this.canvas.remove(p));
+		for (const record of this.editMode.patrons) {
+			record.handles.forEach(h => this.canvas.add(h));
+			record.cpHandles.forEach(h => this.canvas.add(h));
+			record.segments.forEach(s => {
+				this.canvas.add(s.obj);
+				this.canvas.add(s.label);
+			});
+		}
+		this._bringEditHandlesToFront();
+		this.canvas.renderAll();
+
+		return result;
+	}
+
 	exitEditMode() {
 		if (!this.editMode.active) return;
 		this._mergeSnapTarget = null;

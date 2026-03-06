@@ -17,6 +17,10 @@ const CUSTOM_PROPS = [
     '_stripData', 'excludeFromExport',
     '_isAnchor', '_isEndpointAnchor', '_isPathSegment', '_isDimensionLabel',
     '_contourId', '_endpointIndex',
+    // Edit mode (needed for orphan detection after save/load)
+    '_isEditVertex', '_isEditSegment', '_isEditCP',
+    '_patronIndex', '_vertexIndex', '_segmentIndex',
+    '_isDetectionPreview',
 ];
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 10;
@@ -697,10 +701,14 @@ function updateCanvasCursor() {
 // ============================================================
 function saveHistoryState() {
 	const pe = window.atelierModules?.patronEditor;
-	const entry = {
+
+	// Suspend edit mode during serialization so patron Paths are on canvas
+	// and edit handles are not serialized
+	const serialize = () => ({
 		canvas: state.canvas.toJSON(CUSTOM_PROPS),
 		contours: pe ? pe.serializeContours() : [],
-	};
+	});
+	const entry = pe ? pe.withEditModeSuspended(serialize) : serialize();
 
 	// Remove future states if we're not at the end
 	if (state.historyIndex < state.history.length - 1) {
@@ -739,16 +747,19 @@ function loadHistoryState(index) {
 	state.canvas.loadFromJSON(canvasData, () => {
 		const pe = window.atelierModules?.patronEditor;
 
-		// Clear existing contour state
+		// Force-reset edit mode (don't call exitEditMode — handles are stale after loadFromJSON)
 		if (pe) {
 			pe.parkDrawing();
 			pe.contours.forEach(c => c.removeFromCanvas());
 			pe.contours = [];
+			pe.editMode = { active: false, patrons: [], _allHandles: [], _allCPHandles: [] };
 		}
 
-		// Remove orphaned contour objects from the loaded canvas
+		// Remove orphaned objects from the loaded canvas
 		const orphans = state.canvas.getObjects().filter(o =>
-			o._isAnchor || o._isPathSegment || o._isDimensionLabel
+			o._isAnchor || o._isPathSegment || o._isDimensionLabel ||
+			o._isEditVertex || o._isEditSegment || o._isEditCP ||
+			o._isDetectionPreview
 		);
 		orphans.forEach(o => state.canvas.remove(o));
 
@@ -1206,13 +1217,16 @@ function restoreObjectsAfterLoad() {
 function saveProject() {
 	const name = state.projectName;
 	const pe = window.atelierModules?.patronEditor;
-	const data = {
+
+	// Suspend edit mode during serialization
+	const serialize = () => ({
 		name,
 		date: new Date().toISOString(),
 		canvas: state.canvas.toJSON(CUSTOM_PROPS),
 		zoom: state.zoom,
 		contours: pe ? pe.serializeContours() : [],
-	};
+	});
+	const data = pe ? pe.withEditModeSuspended(serialize) : serialize();
 
 	const projects = JSON.parse(localStorage.getItem('atelier_projects') || '{}');
 	projects[name] = data;
@@ -1241,11 +1255,14 @@ function loadProject(name) {
 			pe.parkDrawing();
 			pe.contours.forEach(c => c.removeFromCanvas());
 			pe.contours = [];
-			if (pe.editMode.active) pe.exitEditMode();
+			// Force-reset edit mode (handles are stale after loadFromJSON)
+			pe.editMode = { active: false, patrons: [], _allHandles: [], _allCPHandles: [] };
 		}
 
 		const orphans = state.canvas.getObjects().filter(o =>
-			o._isAnchor || o._isPathSegment || o._isDimensionLabel
+			o._isAnchor || o._isPathSegment || o._isDimensionLabel ||
+			o._isEditVertex || o._isEditSegment || o._isEditCP ||
+			o._isDetectionPreview
 		);
 		orphans.forEach(o => state.canvas.remove(o));
 
@@ -1348,7 +1365,8 @@ function newProject() {
 function downloadProjectJSON() {
 	const pe = window.atelierModules?.patronEditor;
 
-	const data = {
+	// Suspend edit mode during serialization
+	const serialize = () => ({
 		name: state.projectName,
 		date: new Date().toISOString(),
 		version: 1,
@@ -1357,7 +1375,8 @@ function downloadProjectJSON() {
 		viewportTransform: [...state.canvas.viewportTransform],
 		canvas: state.canvas.toJSON(CUSTOM_PROPS),
 		contours: pe ? pe.serializeContours() : [],
-	};
+	});
+	const data = pe ? pe.withEditModeSuspended(serialize) : serialize();
 
 	const json = JSON.stringify(data, null, 2);
 	const blob = new Blob([json], { type: 'application/json' });
@@ -1386,11 +1405,11 @@ function importProjectJSON(file) {
 			// Clear current state
 			const pe = window.atelierModules?.patronEditor;
 			if (pe) {
-				// Park any active drawing and clear contours
 				pe.parkDrawing();
 				pe.contours.forEach(c => c.removeFromCanvas());
 				pe.contours = [];
-				if (pe.editMode.active) pe.exitEditMode();
+				// Force-reset edit mode (handles become stale after loadFromJSON)
+				pe.editMode = { active: false, patrons: [], _allHandles: [], _allCPHandles: [] };
 			}
 
 			state.canvas.loadFromJSON(data.canvas, () => {
@@ -1413,9 +1432,11 @@ function importProjectJSON(file) {
 					}
 				});
 
-				// Remove orphaned contour objects from the loaded canvas
+				// Remove orphaned objects from the loaded canvas
 				const orphans = state.canvas.getObjects().filter(o =>
-					o._isAnchor || o._isPathSegment || o._isDimensionLabel
+					o._isAnchor || o._isPathSegment || o._isDimensionLabel ||
+					o._isEditVertex || o._isEditSegment || o._isEditCP ||
+					o._isDetectionPreview
 				);
 				orphans.forEach(o => state.canvas.remove(o));
 
