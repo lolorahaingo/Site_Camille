@@ -1998,6 +1998,8 @@ export class PatronEditor {
 	// CALIBRATION (unchanged)
 	// ============================================================
 	startCalibration() {
+		this._preCalibrationTool = this.state.activeTool;
+		setActiveTool('line');
 		this.parkDrawing();
 		this.isCalibrating = true;
 		this.calibrationStart = null;
@@ -2033,6 +2035,11 @@ export class PatronEditor {
 			this.isCalibrating = false;
 			this.calibrationStart = null;
 			document.getElementById('status-info').textContent = '';
+			// Restore previous tool mode
+			if (this._preCalibrationTool) {
+				setActiveTool(this._preCalibrationTool);
+				this._preCalibrationTool = null;
+			}
 			this.canvas.renderAll();
 		}
 	}

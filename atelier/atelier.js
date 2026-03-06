@@ -10,6 +10,13 @@ import { Stats } from './modules/stats.js';
 
 // ---- Constants ----
 const BASE_PX_PER_CM = 30;
+const CUSTOM_PROPS = [
+    '_isGrid', '_isBackground', '_isPatron', '_isStrip',
+    '_patronId', '_patronName', '_patronVertices', '_patronSegments',
+    '_stripData', 'excludeFromExport',
+    '_isAnchor', '_isEndpointAnchor', '_isPathSegment', '_isDimensionLabel',
+    '_contourId', '_endpointIndex',
+];
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 10;
 const GRID_COLOR_MAJOR = '#d0d0d0';
@@ -688,14 +695,18 @@ function updateCanvasCursor() {
 // History (Undo/Redo)
 // ============================================================
 function saveHistoryState() {
-	const json = state.canvas.toJSON(['_isGrid', '_isBackground', '_isPatron', '_isStrip', '_patronId', '_patronName', '_patronVertices', '_patronSegments', '_stripData', 'excludeFromExport']);
+	const pe = window.atelierModules?.patronEditor;
+	const entry = {
+		canvas: state.canvas.toJSON(CUSTOM_PROPS),
+		contours: pe ? pe.serializeContours() : [],
+	};
 
 	// Remove future states if we're not at the end
 	if (state.historyIndex < state.history.length - 1) {
 		state.history = state.history.slice(0, state.historyIndex + 1);
 	}
 
-	state.history.push(JSON.stringify(json));
+	state.history.push(JSON.stringify(entry));
 
 	// Limit history size
 	if (state.history.length > state.maxHistory) {
@@ -719,9 +730,34 @@ function redo() {
 }
 
 function loadHistoryState(index) {
-	const json = JSON.parse(state.history[index]);
-	state.canvas.loadFromJSON(json, () => {
+	const entry = JSON.parse(state.history[index]);
+	// Backward compat: old entries are raw canvas JSON, new ones are {canvas, contours}
+	const canvasData = entry.canvas || entry;
+	const contoursData = entry.contours || [];
+
+	state.canvas.loadFromJSON(canvasData, () => {
+		const pe = window.atelierModules?.patronEditor;
+
+		// Clear existing contour state
+		if (pe) {
+			pe.parkDrawing();
+			pe.contours.forEach(c => c.removeFromCanvas());
+			pe.contours = [];
+		}
+
+		// Remove orphaned contour objects from the loaded canvas
+		const orphans = state.canvas.getObjects().filter(o =>
+			o._isAnchor || o._isPathSegment || o._isDimensionLabel
+		);
+		orphans.forEach(o => state.canvas.remove(o));
+
 		restoreObjectsAfterLoad();
+
+		// Restore open contours
+		if (pe && contoursData.length > 0) {
+			pe.deserializeContours(contoursData);
+		}
+
 		drawGrid();
 		state.canvas.renderAll();
 		updateUndoRedoButtons();
@@ -1037,6 +1073,8 @@ function restoreObjectsAfterLoad() {
 	state.canvas.forEachObject(obj => {
 		if (obj._isPatron) {
 			obj.set({
+				fill: obj.fill || 'rgba(100, 149, 237, 0.1)',
+				stroke: obj.stroke || '#4a90d9',
 				selectable: true, evented: true,
 				cornerColor: '#4a90d9', cornerStyle: 'circle', cornerSize: 8,
 				transparentCorners: false, borderColor: '#4a90d9',
@@ -1064,6 +1102,16 @@ function restoreObjectsAfterLoad() {
 
 	// Strips always on top of patrons
 	state.canvas.getObjects().filter(o => o._isStrip).forEach(s => state.canvas.bringToFront(s));
+
+	// Keep only the last _isBackground object; remove any duplicates
+	const bgObjects = state.canvas.getObjects().filter(o => o._isBackground);
+	if (bgObjects.length > 1) {
+		for (let i = 0; i < bgObjects.length - 1; i++) {
+			state.canvas.remove(bgObjects[i]);
+		}
+	}
+	state.backgroundImage = bgObjects.length > 0 ? bgObjects[bgObjects.length - 1] : null;
+	updateCalquePreview();
 }
 
 // ============================================================
@@ -1071,11 +1119,13 @@ function restoreObjectsAfterLoad() {
 // ============================================================
 function saveProject() {
 	const name = state.projectName;
+	const pe = window.atelierModules?.patronEditor;
 	const data = {
 		name,
 		date: new Date().toISOString(),
-		canvas: state.canvas.toJSON(['_isGrid', '_isBackground', '_isPatron', '_isStrip', '_patronId', '_patronName', '_patronVertices', '_patronSegments', '_stripData', 'excludeFromExport']),
+		canvas: state.canvas.toJSON(CUSTOM_PROPS),
 		zoom: state.zoom,
+		contours: pe ? pe.serializeContours() : [],
 	};
 
 	const projects = JSON.parse(localStorage.getItem('atelier_projects') || '{}');
@@ -1100,7 +1150,24 @@ function loadProject(name) {
 
 		document.querySelector('.app-header__project-name').textContent = data.name;
 
+		const pe = window.atelierModules?.patronEditor;
+		if (pe) {
+			pe.parkDrawing();
+			pe.contours.forEach(c => c.removeFromCanvas());
+			pe.contours = [];
+			if (pe.editMode.active) pe.exitEditMode();
+		}
+
+		const orphans = state.canvas.getObjects().filter(o =>
+			o._isAnchor || o._isPathSegment || o._isDimensionLabel
+		);
+		orphans.forEach(o => state.canvas.remove(o));
+
 		restoreObjectsAfterLoad();
+
+		if (pe && data.contours && data.contours.length > 0) {
+			pe.deserializeContours(data.contours);
+		}
 
 		drawGrid();
 		drawRulers();
@@ -1175,6 +1242,7 @@ function newProject() {
 	state.projectName = 'Nouveau projet';
 	document.querySelector('.app-header__project-name').textContent = state.projectName;
 	state.backgroundImage = null;
+	updateCalquePreview();
 	state.history = [];
 	state.historyIndex = -1;
 
@@ -1201,11 +1269,7 @@ function downloadProjectJSON() {
 		pxPerCm: state.pxPerCm,
 		zoom: state.zoom,
 		viewportTransform: [...state.canvas.viewportTransform],
-		canvas: state.canvas.toJSON([
-			'_isGrid', '_isBackground', '_isPatron', '_isStrip',
-			'_patronId', '_patronName', '_patronVertices', '_patronSegments',
-			'_stripData', 'excludeFromExport',
-		]),
+		canvas: state.canvas.toJSON(CUSTOM_PROPS),
 		contours: pe ? pe.serializeContours() : [],
 	};
 
@@ -1263,12 +1327,18 @@ function importProjectJSON(file) {
 					}
 				});
 
+				// Remove orphaned contour objects from the loaded canvas
+				const orphans = state.canvas.getObjects().filter(o =>
+					o._isAnchor || o._isPathSegment || o._isDimensionLabel
+				);
+				orphans.forEach(o => state.canvas.remove(o));
+
+				restoreObjectsAfterLoad();
+
 				// Restore open contours if saved
 				if (pe && data.contours && data.contours.length > 0) {
 					pe.deserializeContours(data.contours);
 				}
-
-				restoreObjectsAfterLoad();
 
 				drawGrid();
 				drawRulers();
@@ -1424,6 +1494,23 @@ function initKeyboardShortcuts() {
 		// Escape — exit edit mode, or park the current drawing
 		if (e.key === 'Escape') {
 			e.preventDefault();
+			// Cancel calibration if active
+			const pe = window.atelierModules?.patronEditor;
+			if (pe && pe.isCalibrating) {
+				pe.tempMarkers.forEach(m => state.canvas.remove(m));
+				pe.tempMarkers = [];
+				if (pe.calibrationLine) { state.canvas.remove(pe.calibrationLine); pe.calibrationLine = null; }
+				pe.isCalibrating = false;
+				pe.calibrationStart = null;
+				document.getElementById('status-info').textContent = '';
+				// Restore previous tool mode
+				if (pe._preCalibrationTool) {
+					setActiveTool(pe._preCalibrationTool);
+					pe._preCalibrationTool = null;
+				}
+				state.canvas.renderAll();
+				return;
+			}
 			if (window.atelierModules?.patronEditor) {
 				const pe = window.atelierModules.patronEditor;
 				if (pe.editMode?.active) {
@@ -1536,6 +1623,44 @@ function initToolbar() {
 			window.atelierModules.patronEditor.startCalibration();
 		}
 	});
+
+	// Delete calque button
+	document.getElementById('btn-delete-calque').addEventListener('click', () => {
+		const bgObjects = state.canvas.getObjects().filter(o => o._isBackground);
+		if (bgObjects.length > 0) {
+			// Cancel calibration if active
+			const pe = window.atelierModules?.patronEditor;
+			if (pe && pe.isCalibrating) {
+				pe.tempMarkers.forEach(m => state.canvas.remove(m));
+				pe.tempMarkers = [];
+				if (pe.calibrationLine) { state.canvas.remove(pe.calibrationLine); pe.calibrationLine = null; }
+				pe.isCalibrating = false;
+				pe.calibrationStart = null;
+				document.getElementById('status-info').textContent = '';
+			}
+			bgObjects.forEach(o => state.canvas.remove(o));
+			state.backgroundImage = null;
+			updateCalquePreview();
+			state.canvas.renderAll();
+			saveHistoryState();
+			showToast('Calque supprimé');
+		}
+	});
+}
+
+// ============================================================
+// Calque Preview
+// ============================================================
+function updateCalquePreview() {
+	const container = document.getElementById('calque-preview');
+	const thumbnail = document.getElementById('calque-thumbnail');
+	if (state.backgroundImage) {
+		thumbnail.src = state.backgroundImage.getSrc();
+		container.style.display = '';
+	} else {
+		thumbnail.src = '';
+		container.style.display = 'none';
+	}
 }
 
 // ============================================================
@@ -1545,10 +1670,9 @@ function importBackgroundImage(file) {
 	const reader = new FileReader();
 	reader.onload = (e) => {
 		fabric.Image.fromURL(e.target.result, (img) => {
-			// Remove existing background image
-			if (state.backgroundImage) {
-				state.canvas.remove(state.backgroundImage);
-			}
+			// Remove ALL existing background images, not just the tracked one
+			state.canvas.getObjects().filter(o => o._isBackground).forEach(o => state.canvas.remove(o));
+			state.backgroundImage = null;
 
 			// Scale image to reasonable size (max 80cm in canvas units)
 			const maxCm = 80;
@@ -1578,6 +1702,7 @@ function importBackgroundImage(file) {
 			state.backgroundImage = img;
 			state.canvas.add(img);
 			state.canvas.sendToBack(img);
+			updateCalquePreview();
 
 			// Send grid lines behind the image... actually image should be behind grid
 			// Re-draw grid so it's on top of the image

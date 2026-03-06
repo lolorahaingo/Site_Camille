@@ -196,6 +196,10 @@
 						<svg class="panel__chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
 					</div>
 					<div class="panel__content panel__content--collapsed" id="content-image">
+						<div id="calque-preview" class="calque-preview" style="display:none">
+							<img id="calque-thumbnail" class="calque-preview__img">
+							<button id="btn-delete-calque" class="calque-preview__delete" title="Supprimer le calque">&times;</button>
+						</div>
 						<div class="panel__field">
 							<label for="image-opacity">Opacité</label>
 							<input type="range" id="image-opacity" min="0" max="100" value="30">
