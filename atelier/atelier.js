@@ -7,6 +7,7 @@ import { PatronEditor } from './modules/patron-editor.js';
 import { PeltManager } from './modules/pelt-manager.js';
 import { PlacementEngine } from './modules/placement-engine.js';
 import { Stats } from './modules/stats.js';
+import { ContourDetector } from './modules/contour-detector.js';
 
 // ---- Constants ----
 const BASE_PX_PER_CM = 30;
@@ -1646,6 +1647,90 @@ function initToolbar() {
 			showToast('Calque supprimé');
 		}
 	});
+
+	// Contour detection
+	document.getElementById('btn-detect-contours').addEventListener('click', async () => {
+		const cd = window.atelierModules?.contourDetector;
+		if (!cd) return;
+		if (!state.backgroundImage) {
+			showToast('Importez d\'abord une image');
+			return;
+		}
+
+		const btn = document.getElementById('btn-detect-contours');
+		btn.disabled = true;
+		btn.textContent = 'Détection en cours...';
+
+		try {
+			const results = await cd.detect();
+			cd.showPreview();
+
+			document.getElementById('detection-settings').style.display = '';
+			document.getElementById('detect-count-label').textContent =
+				`${results.length} contour${results.length > 1 ? 's' : ''} détecté${results.length > 1 ? 's' : ''}`;
+
+			btn.textContent = 'Détecter les contours';
+			btn.disabled = false;
+		} catch (err) {
+			console.error('Detection error:', err);
+			showToast('Erreur lors de la détection');
+			btn.textContent = 'Détecter les contours';
+			btn.disabled = false;
+		}
+	});
+
+	document.getElementById('btn-detect-rerun').addEventListener('click', async () => {
+		const cd = window.atelierModules?.contourDetector;
+		if (!cd) return;
+
+		// Update settings from UI
+		const sensitivity = parseInt(document.getElementById('detect-sensitivity').value);
+		const minArea = parseFloat(document.getElementById('detect-min-area').value);
+
+		// Map sensitivity slider (20-200) to Canny thresholds
+		// Lower sensitivity value = higher thresholds = fewer edges detected
+		// Higher sensitivity value = lower thresholds = more edges detected
+		cd.updateSettings({
+			cannyLow: Math.max(10, 200 - sensitivity),
+			cannyHigh: Math.max(30, 350 - sensitivity),
+			minAreaCm2: minArea,
+		});
+
+		const btn = document.getElementById('btn-detect-rerun');
+		btn.disabled = true;
+		btn.textContent = 'Détection...';
+
+		try {
+			const results = await cd.detect();
+			cd.showPreview();
+
+			document.getElementById('detect-count-label').textContent =
+				`${results.length} contour${results.length > 1 ? 's' : ''} détecté${results.length > 1 ? 's' : ''}`;
+
+			btn.textContent = 'Relancer';
+			btn.disabled = false;
+		} catch (err) {
+			console.error('Detection error:', err);
+			showToast('Erreur lors de la détection');
+			btn.textContent = 'Relancer';
+			btn.disabled = false;
+		}
+	});
+
+	document.getElementById('btn-detect-validate').addEventListener('click', () => {
+		const cd = window.atelierModules?.contourDetector;
+		const pe = window.atelierModules?.patronEditor;
+		if (!cd || !pe) return;
+
+		cd.createPatrons(pe);
+		document.getElementById('detection-settings').style.display = 'none';
+	});
+
+	document.getElementById('btn-detect-cancel').addEventListener('click', () => {
+		const cd = window.atelierModules?.contourDetector;
+		if (cd) cd.clearPreview();
+		document.getElementById('detection-settings').style.display = 'none';
+	});
 }
 
 // ============================================================
@@ -1769,6 +1854,12 @@ function init() {
 		window.atelierModules.stats = new Stats(canvas, state);
 	} catch (e) {
 		console.warn('Stats module not loaded:', e.message);
+	}
+
+	try {
+		window.atelierModules.contourDetector = new ContourDetector(canvas, state);
+	} catch (e) {
+		console.warn('ContourDetector module not loaded:', e.message);
 	}
 
 	// Restore last active project, or save initial state

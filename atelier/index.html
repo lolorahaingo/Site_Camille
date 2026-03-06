@@ -210,13 +210,37 @@
 							<p class="panel__hint">Tracez une ligne sur la photo puis indiquez la mesure réelle pour calibrer l'échelle.</p>
 							<button id="btn-calibrate" class="panel__btn panel__btn--secondary">Calibrer l'échelle</button>
 						</div>
-						<div class="panel__field">
-							<label>
-								<input type="checkbox" id="image-lock" checked> Verrouiller le calque
-							</label>
-						</div>
+					<div class="panel__field">
+						<label>
+							<input type="checkbox" id="image-lock" checked> Verrouiller le calque
+						</label>
 					</div>
+						<div class="panel__divider"></div>
+						<div class="panel__field" id="detection-controls">
+							<label>Détection automatique</label>
+							<p class="panel__hint">Détecte les contours du patron sur la photo importée.</p>
+							<button id="btn-detect-contours" class="panel__btn panel__btn--primary">Détecter les contours</button>
+							<div id="detection-settings" style="display:none">
+								<div class="panel__field">
+									<label for="detect-sensitivity">Sensibilité</label>
+									<input type="range" id="detect-sensitivity" min="20" max="200" value="100">
+								</div>
+								<div class="panel__field">
+									<label for="detect-min-area">Taille min. (cm²)</label>
+									<input type="number" id="detect-min-area" min="1" max="500" value="5" step="1">
+								</div>
+								<div class="panel__field">
+									<label id="detect-count-label">0 contour(s) détecté(s)</label>
+								</div>
+								<div class="panel__field-row">
+									<button id="btn-detect-rerun" class="panel__btn panel__btn--secondary">Relancer</button>
+									<button id="btn-detect-validate" class="panel__btn panel__btn--primary">Valider</button>
+								</div>
+								<button id="btn-detect-cancel" class="panel__btn panel__btn--secondary" style="margin-top:4px;width:100%">Annuler</button>
+							</div>
+						</div>
 				</div>
+			</div>
 
 				<!-- Statistics section -->
 				<div class="panel__section" id="section-stats">

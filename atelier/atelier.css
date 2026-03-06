@@ -949,3 +949,46 @@ html, body {
 	opacity: 1;
 	transform: translateX(-50%) translateY(0);
 }
+
+/* ===== DETECTION ===== */
+.panel__divider {
+	height: 1px;
+	background: rgba(0,0,0,0.08);
+	margin: 12px 0;
+}
+
+.panel__btn--primary {
+	background: #4a90d9;
+	color: #fff;
+	border: none;
+	padding: 8px 12px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 12px;
+	font-weight: 500;
+	width: 100%;
+	transition: background 0.15s;
+}
+
+.panel__btn--primary:hover {
+	background: #3a7bc8;
+}
+
+.panel__btn--primary:disabled {
+	background: #a0a0a0;
+	cursor: not-allowed;
+}
+
+#detection-settings {
+	margin-top: 8px;
+}
+
+#detection-settings .panel__field {
+	margin-bottom: 6px;
+}
+
+#detect-count-label {
+	font-size: 12px;
+	color: #666;
+	font-style: italic;
+}
