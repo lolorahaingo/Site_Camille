@@ -1679,17 +1679,55 @@ function initKeyboardShortcuts() {
 			const pe = window.atelierModules?.patronEditor;
 			if (pe && pe.editMode.active) {
 				const active = state.canvas.getActiveObject();
-				if (active && active._isEditVertex) {
-					pe.deleteEditVertex(active._patronIndex, active._vertexIndex);
-					state.canvas.discardActiveObject();
-					state.canvas.renderAll();
-					saveHistoryState();
-				} else if (active && active._isEditSegment) {
-					pe.deleteEditSegment(active._patronIndex, active._segmentIndex);
-					state.canvas.discardActiveObject();
-					state.canvas.renderAll();
-					saveHistoryState();
+				if (!active) return;
+
+				// Collect all selected edit objects (single or multi-selection)
+				let selected = [];
+				if (active.type === 'activeSelection') {
+					selected = active.getObjects().filter(o =>
+						o._isEditVertex || o._isEditSegment
+					);
+				} else if (active._isEditVertex || active._isEditSegment) {
+					selected = [active];
 				}
+				if (selected.length === 0) return;
+
+				state.canvas.discardActiveObject();
+
+				// Process segments first (they convert patron → open contour,
+				// which removes the patron from edit mode entirely)
+				const segments = selected.filter(o => o._isEditSegment);
+				// Sort by patronIndex desc, then segmentIndex desc (process last first)
+				segments.sort((a, b) =>
+					b._patronIndex !== a._patronIndex
+						? b._patronIndex - a._patronIndex
+						: b._segmentIndex - a._segmentIndex
+				);
+				for (const seg of segments) {
+					// Re-check record still exists (prior deletion may have removed it)
+					const record = pe.editMode.patrons[seg._patronIndex];
+					if (!record) continue;
+					pe.deleteEditSegment(seg._patronIndex, seg._segmentIndex);
+				}
+
+				// Then process vertices in descending index order within each patron
+				const vertices = selected.filter(o => o._isEditVertex);
+				// Sort by patronIndex desc, then vertexIndex desc
+				vertices.sort((a, b) =>
+					b._patronIndex !== a._patronIndex
+						? b._patronIndex - a._patronIndex
+						: b._vertexIndex - a._vertexIndex
+				);
+				for (const vtx of vertices) {
+					const record = pe.editMode.patrons[vtx._patronIndex];
+					if (!record) continue;
+					// Re-check vertex index is still valid (prior deletions shift indices)
+					if (vtx._vertexIndex >= record.vertices.length) continue;
+					pe.deleteEditVertex(vtx._patronIndex, vtx._vertexIndex);
+				}
+
+				state.canvas.renderAll();
+				saveHistoryState();
 				return;
 			}
 			deleteSelection();
