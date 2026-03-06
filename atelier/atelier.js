@@ -1473,14 +1473,20 @@ function initKeyboardShortcuts() {
 		// Delete
 		if (e.key === 'Delete' || e.key === 'Backspace') {
 			e.preventDefault();
-			// In edit mode, only delete a selected vertex — never fall through to deleteSelection
+			// In edit mode, delegate to patron-editor for vertex/segment deletion
 			const pe = window.atelierModules?.patronEditor;
 			if (pe && pe.editMode.active) {
 				const active = state.canvas.getActiveObject();
 				if (active && active._isEditVertex) {
 					pe.deleteEditVertex(active._patronIndex, active._vertexIndex);
+					state.canvas.discardActiveObject();
+					state.canvas.renderAll();
+					saveHistoryState();
 				} else if (active && active._isEditSegment) {
 					pe.deleteEditSegment(active._patronIndex, active._segmentIndex);
+					state.canvas.discardActiveObject();
+					state.canvas.renderAll();
+					saveHistoryState();
 				}
 				return;
 			}
