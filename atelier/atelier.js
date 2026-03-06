@@ -549,6 +549,12 @@ function handleContextMenu(opt) {
 	} else if (target && target._isEditSegment) {
 		// Edit mode: right-click on a segment
 		menu.innerHTML = `<div class="context-menu__item context-menu__item--danger" data-action="delete-segment" data-patron-index="${target._patronIndex}" data-segment-index="${target._segmentIndex}">Supprimer le segment <span class="context-menu__shortcut">Suppr</span></div>`;
+	} else if (target && target._isAnchor && target._contourId) {
+		// Open contour: right-click on an anchor point (endpoint or interior)
+		const anchorPtIdx = target._isEndpointAnchor
+			? (target._endpointIndex === 0 ? 0 : -1) // -1 = last point, resolved at action time
+			: (target._anchorIndex ?? -2); // -2 = unknown
+		menu.innerHTML = `<div class="context-menu__item context-menu__item--danger" data-action="delete-contour-point" data-contour-id="${target._contourId}" data-point-index="${anchorPtIdx}">Supprimer le point <span class="context-menu__shortcut">Suppr</span></div>`;
 	} else if (target && !target._isGrid && !target._isEditCP) {
 		menu.innerHTML = `
 			<div class="context-menu__item" data-action="duplicate">Dupliquer <span class="context-menu__shortcut">Ctrl+D</span></div>
@@ -586,6 +592,23 @@ function handleContextMenu(opt) {
 			const sIdx = parseInt(item.dataset.segmentIndex, 10);
 			if (window.atelierModules?.patronEditor) {
 				window.atelierModules.patronEditor.deleteEditSegment(pIdx, sIdx);
+			}
+		} else if (action === 'delete-contour-point') {
+			const contourId = item.dataset.contourId;
+			const pe = window.atelierModules?.patronEditor;
+			if (pe) {
+				const contour = pe.contours.find(c => c.id === contourId);
+				if (contour) {
+					let ptIdx = parseInt(item.dataset.pointIndex, 10);
+					// -1 = last endpoint
+					if (ptIdx === -1) ptIdx = contour.points.length - 1;
+					// -2 = unknown, shouldn't happen
+					if (ptIdx < 0) ptIdx = 0;
+					state.canvas.discardActiveObject();
+					pe.deleteContourPoint(contour, ptIdx);
+					state.canvas.renderAll();
+					saveHistoryState();
+				}
 			}
 		} else if (action) {
 			handleContextAction(action, target);
@@ -1675,13 +1698,11 @@ function initKeyboardShortcuts() {
 		// Delete
 		if (e.key === 'Delete' || e.key === 'Backspace') {
 			e.preventDefault();
-			// In edit mode, delegate to patron-editor for vertex/segment deletion
 			const pe = window.atelierModules?.patronEditor;
-			if (pe && pe.editMode.active) {
-				const active = state.canvas.getActiveObject();
-				if (!active) return;
+			const active = state.canvas.getActiveObject();
 
-				// Collect all selected edit objects (single or multi-selection)
+			// --- Edit mode: delete selected vertices/segments ---
+			if (pe && pe.editMode.active && active) {
 				let selected = [];
 				if (active.type === 'activeSelection') {
 					selected = active.getObjects().filter(o =>
@@ -1690,46 +1711,28 @@ function initKeyboardShortcuts() {
 				} else if (active._isEditVertex || active._isEditSegment) {
 					selected = [active];
 				}
-				if (selected.length === 0) return;
-
-				state.canvas.discardActiveObject();
-
-				// Process segments first (they convert patron → open contour,
-				// which removes the patron from edit mode entirely)
-				const segments = selected.filter(o => o._isEditSegment);
-				// Sort by patronIndex desc, then segmentIndex desc (process last first)
-				segments.sort((a, b) =>
-					b._patronIndex !== a._patronIndex
-						? b._patronIndex - a._patronIndex
-						: b._segmentIndex - a._segmentIndex
-				);
-				for (const seg of segments) {
-					// Re-check record still exists (prior deletion may have removed it)
-					const record = pe.editMode.patrons[seg._patronIndex];
-					if (!record) continue;
-					pe.deleteEditSegment(seg._patronIndex, seg._segmentIndex);
+				if (selected.length > 0) {
+					state.canvas.discardActiveObject();
+					pe.deleteMultipleEditObjects(selected);
+					state.canvas.renderAll();
+					saveHistoryState();
+					return;
 				}
-
-				// Then process vertices in descending index order within each patron
-				const vertices = selected.filter(o => o._isEditVertex);
-				// Sort by patronIndex desc, then vertexIndex desc
-				vertices.sort((a, b) =>
-					b._patronIndex !== a._patronIndex
-						? b._patronIndex - a._patronIndex
-						: b._vertexIndex - a._vertexIndex
-				);
-				for (const vtx of vertices) {
-					const record = pe.editMode.patrons[vtx._patronIndex];
-					if (!record) continue;
-					// Re-check vertex index is still valid (prior deletions shift indices)
-					if (vtx._vertexIndex >= record.vertices.length) continue;
-					pe.deleteEditVertex(vtx._patronIndex, vtx._vertexIndex);
-				}
-
-				state.canvas.renderAll();
-				saveHistoryState();
-				return;
 			}
+
+			// --- Open contour: delete selected endpoint or anchor ---
+			if (pe && active && active._isEndpointAnchor && active._contourId) {
+				const contour = pe.contours.find(c => c.id === active._contourId);
+				if (contour) {
+					const ptIdx = active._endpointIndex === 0 ? 0 : contour.points.length - 1;
+					state.canvas.discardActiveObject();
+					pe.deleteContourPoint(contour, ptIdx);
+					state.canvas.renderAll();
+					saveHistoryState();
+					return;
+				}
+			}
+
 			deleteSelection();
 		}
 

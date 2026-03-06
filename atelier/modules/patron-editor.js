@@ -136,7 +136,9 @@ class OpenContour {
 			stroke: '#4a90d9',
 			strokeWidth: 1.5 / zoom,
 			selectable: false,
-			evented: false,
+			evented: true, // Respond to right-click for context menu
+			hasBorders: false, hasControls: false,
+			hoverCursor: 'default',
 			_isAnchor: true,
 			_contourId: this.id,
 		});
@@ -168,7 +170,7 @@ class OpenContour {
 					_endpointIndex: i, // 0 = start, anchors.length-1 = end
 				});
 			} else {
-				// Interior anchors: not interactive, top-left origin
+				// Interior anchors: not draggable, but respond to right-click
 				a.set({
 					radius: r,
 					originX: 'left', originY: 'top',
@@ -177,8 +179,11 @@ class OpenContour {
 					fill: '#fff',
 					stroke: '#4a90d9',
 					strokeWidth: 1.5 / zoom,
-					selectable: false, evented: false,
+					selectable: false, evented: true,
+					hasBorders: false, hasControls: false,
+					hoverCursor: 'default',
 					_isEndpointAnchor: false,
+					_anchorIndex: i,
 				});
 			}
 			// Sync Fabric's hit-testing bounding box after position/origin changes
@@ -1866,6 +1871,174 @@ export class PatronEditor {
 
 		showToast('Segment supprimé — le patron est maintenant un contour ouvert');
 		if (window.atelierModules?.stats) window.atelierModules.stats.update();
+	}
+
+	// Delete multiple edit objects at once (vertices and/or segments).
+	// Uses handle identity (object reference) instead of indices to avoid
+	// stale-index problems after each individual deletion.
+	deleteMultipleEditObjects(objects) {
+		if (!objects || objects.length === 0) return;
+
+		// Separate vertices and segments, keyed by their handle reference
+		const vertexHandles = new Set(objects.filter(o => o._isEditVertex));
+		const segmentHandles = new Set(objects.filter(o => o._isEditSegment));
+
+		// --- 1. Process segment deletions first (they remove entire patrons from edit mode) ---
+		for (const segHandle of segmentHandles) {
+			// Find which record currently owns this segment handle
+			let found = false;
+			for (let pIdx = 0; pIdx < this.editMode.patrons.length; pIdx++) {
+				const record = this.editMode.patrons[pIdx];
+				const sIdx = record.segments.findIndex(s => s.obj === segHandle);
+				if (sIdx !== -1) {
+					this.deleteEditSegment(pIdx, sIdx);
+					found = true;
+					break;
+				}
+			}
+		}
+
+		// --- 2. Process vertex deletions by patron, in reverse order ---
+		// Group vertex handles by their owning patron record (using object identity)
+		const patronVertexMap = new Map(); // record → [handle, ...]
+		for (const vtxHandle of vertexHandles) {
+			for (const record of this.editMode.patrons) {
+				if (record.handles.includes(vtxHandle)) {
+					if (!patronVertexMap.has(record)) patronVertexMap.set(record, []);
+					patronVertexMap.get(record).push(vtxHandle);
+					break;
+				}
+			}
+		}
+
+		for (const [record, handles] of patronVertexMap) {
+			const pIdx = this.editMode.patrons.indexOf(record);
+			if (pIdx === -1) continue; // Record was removed by a segment deletion
+
+			// If ALL (or all but <3) vertices are selected, delete the entire patron
+			const remainingCount = record.vertices.length - handles.length;
+			if (remainingCount < 3) {
+				// Remove all edit objects and discard the patron entirely
+				record.handles.forEach(h => this.canvas.remove(h));
+				record.cpHandles.forEach(h => this.canvas.remove(h));
+				record.segments.forEach(s => {
+					this.canvas.remove(s.obj);
+					this.canvas.remove(s.label);
+				});
+				this.editMode.patrons.splice(pIdx, 1);
+				showToast(`Patron supprimé (trop peu de points restants)`);
+				continue;
+			}
+
+			// Delete vertices one by one, in reverse index order.
+			// Find current index of each handle in record.handles (identity-based).
+			const indicesToDelete = handles
+				.map(h => record.handles.indexOf(h))
+				.filter(i => i !== -1)
+				.sort((a, b) => b - a); // descending
+
+			for (const vIdx of indicesToDelete) {
+				if (record.vertices.length <= 3) break;
+				// Use the current index (identity-based, not stale)
+				this.deleteEditVertex(pIdx, vIdx);
+			}
+		}
+
+		// Clean up edit mode if no patrons remain
+		if (this.editMode.patrons.length === 0) {
+			this.editMode.active = false;
+			this.editMode._allHandles = [];
+			this.editMode._allCPHandles = [];
+			document.getElementById('status-info').textContent = '';
+		} else {
+			this._reindexAllHandles();
+			this._rebuildEditHandleLookups();
+			this._bringEditHandlesToFront();
+		}
+
+		this.canvas.renderAll();
+		if (window.atelierModules?.stats) window.atelierModules.stats.update();
+	}
+
+	// Delete a point from an open contour.
+	// If it's an interior point, removes the point and its two adjacent segments,
+	// replacing them with a single bridging segment.
+	// If it's an endpoint, removes the point and its one adjacent segment.
+	deleteContourPoint(contour, pointIndex) {
+		if (!contour || pointIndex < 0 || pointIndex >= contour.points.length) return;
+
+		// If only 2 points remain, delete the entire contour
+		if (contour.points.length <= 2) {
+			contour.removeFromCanvas();
+			this.contours = this.contours.filter(c => c !== contour);
+			if (this.activeContour === contour) this.activeContour = null;
+			showToast('Contour supprimé');
+			return;
+		}
+
+		const n = contour.points.length;
+		const isStart = (pointIndex === 0);
+		const isEnd = (pointIndex === n - 1);
+
+		// Remove the anchor
+		this.canvas.remove(contour.anchors[pointIndex]);
+		contour.anchors.splice(pointIndex, 1);
+		contour.points.splice(pointIndex, 1);
+
+		if (isStart) {
+			// Remove first segment and its label
+			this.canvas.remove(contour.segments[0]);
+			this.canvas.remove(contour.labels[0]);
+			contour.segments.splice(0, 1);
+			contour.labels.splice(0, 1);
+		} else if (isEnd) {
+			// Remove last segment and its label
+			const lastIdx = contour.segments.length - 1;
+			this.canvas.remove(contour.segments[lastIdx]);
+			this.canvas.remove(contour.labels[lastIdx]);
+			contour.segments.splice(lastIdx, 1);
+			contour.labels.splice(lastIdx, 1);
+		} else {
+			// Interior point: remove two adjacent segments, replace with one
+			const prevSegIdx = pointIndex - 1;
+			const nextSegIdx = pointIndex; // after point removal, this is the seg that was after
+
+			// Remove both segments and labels (descending order)
+			for (const si of [nextSegIdx, prevSegIdx]) {
+				this.canvas.remove(contour.segments[si]);
+				this.canvas.remove(contour.labels[si]);
+			}
+			contour.segments.splice(nextSegIdx, 1);
+			contour.labels.splice(nextSegIdx, 1);
+			contour.segments.splice(prevSegIdx, 1);
+			contour.labels.splice(prevSegIdx, 1);
+
+			// Create bridging segment
+			const from = contour.points[prevSegIdx];
+			const to = contour.points[prevSegIdx + 1] || contour.points[prevSegIdx];
+			if (from && to && from !== to) {
+				const zoom = this.canvas.getZoom();
+				const bridgeSeg = new fabric.Line([from.x, from.y, to.x, to.y], {
+					stroke: '#333', strokeWidth: 2 / zoom,
+					selectable: false, evented: false,
+					_isPathSegment: true, _contourId: contour.id,
+				});
+				const pxPerCm = this.state.pxPerCm;
+				const offset = 12 / zoom;
+				const lengthCm = dist(from, to) / pxPerCm;
+				const lPos = labelPosition(from, to, offset);
+				const label = makeDimensionLabel(this.canvas, lengthCm.toFixed(1) + ' cm', lPos, zoom);
+
+				this.canvas.add(bridgeSeg);
+				this.canvas.add(label);
+				contour.segments.splice(prevSegIdx, 0, bridgeSeg);
+				contour.labels.splice(prevSegIdx, 0, label);
+			}
+		}
+
+		// Refresh endpoint styles
+		contour._refreshEndpointStyles(true);
+		this.canvas.renderAll();
 	}
 
 	// Convert an edit mode patron record into an OpenContour.
