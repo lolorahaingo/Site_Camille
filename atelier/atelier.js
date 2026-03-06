@@ -755,10 +755,10 @@ function loadHistoryState(index) {
 			pe.editMode = { active: false, patrons: [], _allHandles: [], _allCPHandles: [] };
 		}
 
-		// Remove orphaned objects from the loaded canvas
+		// Recover orphaned edit objects as patrons, then clean up remaining orphans
+		recoverOrphanedEditObjects();
 		const orphans = state.canvas.getObjects().filter(o =>
 			o._isAnchor || o._isPathSegment || o._isDimensionLabel ||
-			o._isEditVertex || o._isEditSegment || o._isEditCP ||
 			o._isDetectionPreview
 		);
 		orphans.forEach(o => state.canvas.remove(o));
@@ -1162,6 +1162,101 @@ function selectAll() {
 }
 
 // ============================================================
+// Recover orphaned edit mode objects — rebuild patrons from stale handles.
+// This should never happen (withEditModeSuspended prevents it), but if it
+// does, we salvage the data instead of silently deleting it.
+// ============================================================
+function recoverOrphanedEditObjects() {
+	const allObjects = state.canvas.getObjects();
+	const editVertices = allObjects.filter(o => o._isEditVertex);
+	const editSegments = allObjects.filter(o => o._isEditSegment);
+	const editCPs = allObjects.filter(o => o._isEditCP);
+
+	if (editVertices.length === 0) return;
+
+	// Group vertices by _patronIndex
+	const groups = {};
+	for (const v of editVertices) {
+		const pIdx = v._patronIndex ?? 0;
+		if (!groups[pIdx]) groups[pIdx] = { vertices: [], segments: [], cps: [] };
+		groups[pIdx].vertices.push(v);
+	}
+	for (const s of editSegments) {
+		const pIdx = s._patronIndex ?? 0;
+		if (groups[pIdx]) groups[pIdx].segments.push(s);
+	}
+	for (const cp of editCPs) {
+		const pIdx = cp._patronIndex ?? 0;
+		if (groups[pIdx]) groups[pIdx].cps.push(cp);
+	}
+
+	let recovered = 0;
+	const pe = window.atelierModules?.patronEditor;
+
+	for (const pIdx of Object.keys(groups)) {
+		const group = groups[pIdx];
+		// Sort vertices by _vertexIndex
+		group.vertices.sort((a, b) => (a._vertexIndex ?? 0) - (b._vertexIndex ?? 0));
+
+		const points = group.vertices.map(v => ({ x: v.left, y: v.top }));
+		if (points.length < 3) continue; // Not enough points for a patron
+
+		// Build segment metadata — check for curve CPs
+		const segmentsMeta = [];
+		for (let i = 0; i < points.length; i++) {
+			const cp = group.cps.find(c => (c._segmentIndex ?? -1) === i);
+			if (cp) {
+				segmentsMeta.push({ type: 'Q', cp: { x: cp.left, y: cp.top } });
+			} else {
+				segmentsMeta.push({ type: 'L' });
+			}
+		}
+
+		// Build SVG path
+		let pathStr = `M ${points[0].x} ${points[0].y}`;
+		for (let i = 0; i < segmentsMeta.length; i++) {
+			const to = points[(i + 1) % points.length];
+			if (segmentsMeta[i].type === 'Q' && segmentsMeta[i].cp) {
+				pathStr += ` Q ${segmentsMeta[i].cp.x} ${segmentsMeta[i].cp.y} ${to.x} ${to.y}`;
+			} else {
+				pathStr += ` L ${to.x} ${to.y}`;
+			}
+		}
+		pathStr += ' Z';
+
+		// Create patron
+		if (pe) {
+			pe._createPatronFromPath(pathStr, points, segmentsMeta);
+		} else {
+			// Fallback: create raw fabric Path
+			const patron = new fabric.Path(pathStr, {
+				fill: 'rgba(100, 149, 237, 0.1)',
+				stroke: '#4a90d9',
+				strokeWidth: 2 / state.canvas.getZoom(),
+				selectable: true, evented: true,
+				_isPatron: true,
+				_patronId: 'recovered_' + Date.now() + '_' + pIdx,
+				_patronName: `Patron récupéré ${parseInt(pIdx) + 1}`,
+				_patronVertices: points,
+				_patronSegments: segmentsMeta,
+				cornerColor: '#4a90d9', cornerStyle: 'circle', cornerSize: 8,
+				transparentCorners: false, borderColor: '#4a90d9',
+			});
+			state.canvas.add(patron);
+		}
+		recovered++;
+	}
+
+	// Remove all orphaned edit objects from canvas
+	[...editVertices, ...editSegments, ...editCPs].forEach(o => state.canvas.remove(o));
+
+	if (recovered > 0) {
+		showToast(`${recovered} patron${recovered > 1 ? 's' : ''} récupéré${recovered > 1 ? 's' : ''} depuis des données orphelines`);
+		console.warn(`Recovered ${recovered} patron(s) from orphaned edit mode objects`);
+	}
+}
+
+// ============================================================
 // Restore object properties after loadFromJSON
 // Fabric.js doesn't serialize visual/interaction properties like
 // cornerColor, selectable, etc. — we must reapply them.
@@ -1259,9 +1354,10 @@ function loadProject(name) {
 			pe.editMode = { active: false, patrons: [], _allHandles: [], _allCPHandles: [] };
 		}
 
+		// Recover orphaned edit objects as patrons, then clean up remaining orphans
+		recoverOrphanedEditObjects();
 		const orphans = state.canvas.getObjects().filter(o =>
 			o._isAnchor || o._isPathSegment || o._isDimensionLabel ||
-			o._isEditVertex || o._isEditSegment || o._isEditCP ||
 			o._isDetectionPreview
 		);
 		orphans.forEach(o => state.canvas.remove(o));
@@ -1432,10 +1528,10 @@ function importProjectJSON(file) {
 					}
 				});
 
-				// Remove orphaned objects from the loaded canvas
+				// Recover orphaned edit objects as patrons, then clean up remaining orphans
+				recoverOrphanedEditObjects();
 				const orphans = state.canvas.getObjects().filter(o =>
 					o._isAnchor || o._isPathSegment || o._isDimensionLabel ||
-					o._isEditVertex || o._isEditSegment || o._isEditCP ||
 					o._isDetectionPreview
 				);
 				orphans.forEach(o => state.canvas.remove(o));
