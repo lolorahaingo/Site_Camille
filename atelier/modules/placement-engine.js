@@ -372,20 +372,43 @@ export class PlacementEngine {
 			}
 		}
 		
-		// Calculate covered area (strips inside patrons)
+		// Calculate covered area (only the portion of strips that overlaps patrons)
+		// Uses bounding-box intersection for performance
+		const patronBounds = patrons.map(p => p.getBoundingRect(true));
 		let coveredArea = 0;
 		for (const strip of strips) {
-			const w = strip.width * (strip.scaleX || 1);
-			const h = strip.height * (strip.scaleY || 1);
-			coveredArea += w * h;
+			const sb = strip.getBoundingRect(true);
+			let stripCovered = 0;
+			for (const pb of patronBounds) {
+				// Intersection rectangle
+				const ix1 = Math.max(sb.left, pb.left);
+				const iy1 = Math.max(sb.top, pb.top);
+				const ix2 = Math.min(sb.left + sb.width, pb.left + pb.width);
+				const iy2 = Math.min(sb.top + sb.height, pb.top + pb.height);
+				if (ix2 > ix1 && iy2 > iy1) {
+					stripCovered += (ix2 - ix1) * (iy2 - iy1);
+				}
+			}
+			// Cap at the strip's own area (overlapping multiple patrons shouldn't exceed 100%)
+			const stripArea = sb.width * sb.height;
+			coveredArea += Math.min(stripCovered, stripArea);
 		}
 		
+		// Total strip area (all strips, regardless of position)
+		let totalStripArea = 0;
+		for (const strip of strips) {
+			const sb = strip.getBoundingRect(true);
+			totalStripArea += sb.width * sb.height;
+		}
+
 		// Convert from px² to cm²
 		const pxPerCm = this.state.pxPerCm;
 		const patronAreaCm2 = patronArea / (pxPerCm * pxPerCm);
 		const coveredAreaCm2 = coveredArea / (pxPerCm * pxPerCm);
-		const wasteAreaCm2 = Math.max(0, patronAreaCm2 - coveredAreaCm2);
-		const wastePct = patronAreaCm2 > 0 ? (wasteAreaCm2 / patronAreaCm2) * 100 : 0;
+		const totalStripAreaCm2 = totalStripArea / (pxPerCm * pxPerCm);
+		// Waste = portion of strips that falls outside patrons (will be cut off)
+		const wasteAreaCm2 = Math.max(0, totalStripAreaCm2 - coveredAreaCm2);
+		const wastePct = totalStripAreaCm2 > 0 ? (wasteAreaCm2 / totalStripAreaCm2) * 100 : 0;
 		
 		// Count pelts needed
 		const peltCounts = {};

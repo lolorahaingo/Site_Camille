@@ -3,12 +3,13 @@
     "id": "mink_male",
     "name": "Vison (Mâle)",
     "sizes": [
-      { "label": "0 (Zéro)", "length_cm": 60, "width_cm": 10.5 },
-      { "label": "1", "length_cm": 63, "width_cm": 11.5 },
-      { "label": "2", "length_cm": 67, "width_cm": 12.5 },
-      { "label": "3", "length_cm": 72, "width_cm": 13.5 },
-      { "label": "4", "length_cm": 77, "width_cm": 14.5 },
-      { "label": "5 (Jumbo)", "length_cm": 82, "width_cm": 15.5 }
+      { "label": "00 (Double Zéro)", "length_cm": 54, "width_cm": 10 },
+      { "label": "0 (Zéro)", "length_cm": 57, "width_cm": 11 },
+      { "label": "1", "length_cm": 60, "width_cm": 11.5 },
+      { "label": "2", "length_cm": 64, "width_cm": 12.5 },
+      { "label": "3", "length_cm": 67, "width_cm": 13 },
+      { "label": "4", "length_cm": 70, "width_cm": 14 },
+      { "label": "5 (Jumbo)", "length_cm": 73, "width_cm": 15 }
     ],
     "defaultStripWidth_cm": 13,
     "color": "#8B7355"

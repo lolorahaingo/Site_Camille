@@ -50,7 +50,7 @@ export class Stats {
 			? `${stats.coveredAreaCm2.toLocaleString('fr-FR')} cm²` 
 			: '— cm²';
 		
-		this.els.wasteArea.textContent = stats.patronAreaCm2 > 0 
+		this.els.wasteArea.textContent = stats.stripCount > 0 
 			? `${stats.wasteAreaCm2.toLocaleString('fr-FR')} cm²` 
 			: '— cm²';
 		
@@ -58,7 +58,7 @@ export class Stats {
 		const wastePctEl = this.els.wastePct;
 		const highlightEl = wastePctEl.closest('.stats__item--highlight');
 		
-		if (stats.patronAreaCm2 > 0) {
+		if (stats.stripCount > 0) {
 			wastePctEl.textContent = `${stats.wastePct} %`;
 			
 			// Color coding

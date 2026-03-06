@@ -88,7 +88,8 @@ class OpenContour {
 	get endPoint() { return this.points[this.points.length - 1] || null; }
 
 	// -- Add a point at the END and draw the segment from previous end --
-	addPointEnd(point, segmentObj) {
+	// endpointsDraggable: false during drawing (endpoints not interactive), true when parked
+	addPointEnd(point, segmentObj, endpointsDraggable = true) {
 		this.points.push(point);
 		if (segmentObj) {
 			this.segments.push(segmentObj);
@@ -96,11 +97,11 @@ class OpenContour {
 			this._addLabel(segmentObj, this.points.length - 2, this.points.length - 1);
 		}
 		this._addAnchor(point);
-		this._refreshEndpointStyles();
+		this._refreshEndpointStyles(endpointsDraggable);
 	}
 
 	// -- Add a point at the START and draw the segment to previous start --
-	addPointStart(point, segmentObj) {
+	addPointStart(point, segmentObj, endpointsDraggable = true) {
 		this.points.unshift(point);
 		if (segmentObj) {
 			this.segments.unshift(segmentObj);
@@ -108,7 +109,7 @@ class OpenContour {
 			this._addLabelAtStart(segmentObj, 0, 1);
 		}
 		this._addAnchorAtStart(point);
-		this._refreshEndpointStyles();
+		this._refreshEndpointStyles(endpointsDraggable);
 	}
 
 	// -- Visual: anchor circle --
@@ -141,25 +142,52 @@ class OpenContour {
 		});
 	}
 
-	// Endpoints get a special look so the user knows they're clickable
-	_refreshEndpointStyles() {
+	// Endpoints get a special look and are draggable so the user can drag-merge them.
+	// When endpointsDraggable is false (during drawing), endpoints are styled but not interactive.
+	_refreshEndpointStyles(endpointsDraggable = true) {
 		const zoom = this.canvas.getZoom();
 		this.anchors.forEach((a, i) => {
 			const isEndpoint = (i === 0 || i === this.anchors.length - 1);
 			const r = isEndpoint ? 6 / zoom : 4 / zoom;
-			a.set({
-				radius: r,
-				left: this.points[i].x - r,
-				top: this.points[i].y - r,
-				fill: isEndpoint ? '#4a90d9' : '#fff',
-				stroke: '#4a90d9',
-				strokeWidth: (isEndpoint ? 2 : 1.5) / zoom,
-			});
+			if (isEndpoint) {
+				// Endpoint anchors: centered origin, optionally draggable
+				a.set({
+					radius: r,
+					originX: 'center', originY: 'center',
+					left: this.points[i].x,
+					top: this.points[i].y,
+					fill: '#4a90d9',
+					stroke: '#4a90d9',
+					strokeWidth: 2 / zoom,
+					selectable: endpointsDraggable, evented: endpointsDraggable,
+					hasBorders: false, hasControls: false,
+					hoverCursor: endpointsDraggable ? 'move' : 'default',
+					moveCursor: 'move',
+					_isEndpointAnchor: true,
+					_contourId: this.id,
+					_endpointIndex: i, // 0 = start, anchors.length-1 = end
+				});
+			} else {
+				// Interior anchors: not interactive, top-left origin
+				a.set({
+					radius: r,
+					originX: 'left', originY: 'top',
+					left: this.points[i].x - r,
+					top: this.points[i].y - r,
+					fill: '#fff',
+					stroke: '#4a90d9',
+					strokeWidth: 1.5 / zoom,
+					selectable: false, evented: false,
+					_isEndpointAnchor: false,
+				});
+			}
+			// Sync Fabric's hit-testing bounding box after position/origin changes
+			a.setCoords();
 		});
 		this.canvas.renderAll();
 	}
 
-	// Highlight an endpoint on hover
+	// Highlight an endpoint on hover or snap
 	highlightEndpoint(index, on) {
 		const a = this.anchors[index];
 		if (!a) return;
@@ -167,12 +195,91 @@ class OpenContour {
 		const r = on ? 9 / zoom : 6 / zoom;
 		a.set({
 			radius: r,
-			left: this.points[index].x - r,
-			top: this.points[index].y - r,
+			left: this.points[index].x,
+			top: this.points[index].y,
 			fill: on ? '#2ecc71' : '#4a90d9',
 			strokeWidth: (on ? 2.5 : 2) / zoom,
 		});
+		// Sync hit-testing bounding box after radius/position change
+		a.setCoords();
 		this.canvas.renderAll();
+	}
+
+	// Update an endpoint position during drag — rebuilds the adjacent segment and label
+	updateEndpointPosition(endpointIdx, x, y) {
+		this.points[endpointIdx] = { x, y };
+
+		const zoom = this.canvas.getZoom();
+		const pxPerCm = this.state.pxPerCm;
+		const offset = 12 / zoom;
+
+		if (endpointIdx === 0 && this.segments.length > 0) {
+			// Start point moved — rebuild first segment and label
+			this._rebuildSegment(0, zoom, pxPerCm, offset);
+		} else if (endpointIdx === this.points.length - 1 && this.segments.length > 0) {
+			// End point moved — rebuild last segment and label
+			this._rebuildSegment(this.segments.length - 1, zoom, pxPerCm, offset);
+		}
+	}
+
+	// Rebuild a single segment's fabric object and label in place
+	_rebuildSegment(segIdx, zoom, pxPerCm, offset) {
+		const from = this.points[segIdx];
+		const to = this.points[segIdx + 1];
+		const oldSeg = this.segments[segIdx];
+		const oldLabel = this.labels[segIdx];
+
+		// Remove old objects
+		this.canvas.remove(oldSeg);
+		this.canvas.remove(oldLabel);
+
+		// Detect segment type and rebuild
+		let newSeg, lengthCm, lPos;
+		if (oldSeg.type === 'path' && oldSeg.path) {
+			// Quadratic Bézier — extract CP from old path, keep it fixed
+			let cp = null;
+			for (const cmd of oldSeg.path) {
+				if (cmd[0] === 'Q') { cp = { x: cmd[1], y: cmd[2] }; break; }
+			}
+			if (cp) {
+				const pathStr = `M ${from.x} ${from.y} Q ${cp.x} ${cp.y} ${to.x} ${to.y}`;
+				newSeg = new fabric.Path(pathStr, {
+					stroke: '#333', strokeWidth: 2 / zoom,
+					fill: '',
+					selectable: false, evented: false,
+					_isPathSegment: true, _contourId: this.id,
+				});
+				lengthCm = bezierLength(from, cp, to) / pxPerCm;
+				const mid = bezierMidpoint(from, cp, to);
+				lPos = labelPosition(from, to, offset);
+				lPos.x = mid.x + (lPos.x - (from.x + to.x) / 2);
+				lPos.y = mid.y + (lPos.y - (from.y + to.y) / 2);
+			} else {
+				// Fallback to line
+				newSeg = new fabric.Line([from.x, from.y, to.x, to.y], {
+					stroke: '#333', strokeWidth: 2 / zoom,
+					selectable: false, evented: false,
+					_isPathSegment: true, _contourId: this.id,
+				});
+				lengthCm = dist(from, to) / pxPerCm;
+				lPos = labelPosition(from, to, offset);
+			}
+		} else {
+			// Straight line
+			newSeg = new fabric.Line([from.x, from.y, to.x, to.y], {
+				stroke: '#333', strokeWidth: 2 / zoom,
+				selectable: false, evented: false,
+				_isPathSegment: true, _contourId: this.id,
+			});
+			lengthCm = dist(from, to) / pxPerCm;
+			lPos = labelPosition(from, to, offset);
+		}
+
+		const newLabel = makeDimensionLabel(this.canvas, lengthCm.toFixed(1) + ' cm', lPos, zoom);
+		this.canvas.add(newSeg);
+		this.canvas.add(newLabel);
+		this.segments[segIdx] = newSeg;
+		this.labels[segIdx] = newLabel;
 	}
 
 	// -- Dimension labels --
@@ -302,17 +409,12 @@ export class PatronEditor {
 		this.tempLine = null;
 		this.tempCurve = null;
 		this.tempCurveHandles = [];
-		this.tempArcMarkers = [];
+		this.tempMarkers = [];
 
 		// Sub-tool state
 		this.curveState = 'idle';
 		this.curveStart = null;
 		this.curveEnd = null;
-		this.arcPoints = [];
-
-		// Rectangle
-		this.rectStart = null;
-		this.tempRect = null;
 
 		// Calibration
 		this.isCalibrating = false;
@@ -335,8 +437,13 @@ export class PatronEditor {
 			_allCPHandles: [],  // all CP handles across all patrons
 		};
 
-		// Merge mode: waiting for user to click a target vertex from another patron
-		this._mergeSource = null; // { patronIndex, vertexIndex } or null
+		// Drag-snap merge: tracks snap target during vertex drag in edit mode
+		this._mergeSnapTarget = null; // { patronIndex, vertexIndex } or null
+		this._mergeSnapSource = null; // { patronIndex, vertexIndex } or null
+
+		// Drag-snap merge: tracks snap target during endpoint drag on open contours
+		this._contourSnapTarget = null; // { contour, endpointIndex } or null
+		this._contourSnapSource = null; // { contour, endpointIndex } or null
 
 		// Selection dimension labels (shown when patron is selected but not in edit mode)
 		this._selectionLabels = [];
@@ -349,18 +456,13 @@ export class PatronEditor {
 	// Tool delegation
 	// ============================================================
 	setTool(tool) {
-		const drawingTools = ['line', 'curve', 'arc'];
+		const drawingTools = ['line', 'curve'];
 		const isDrawingTool = drawingTools.includes(tool);
 
 		// Clean up sub-tool temp objects (but keep the contour)
 		this._cleanupTempObjects();
 
-		if (tool === 'rect' && this.isDrawing) {
-			// Park current drawing before switching to rect
-			this.parkDrawing();
-		}
-
-		if (!isDrawingTool && tool !== 'select' && tool !== 'rect') {
+		if (!isDrawingTool && tool !== 'select') {
 			this.parkDrawing();
 		}
 	}
@@ -371,8 +473,6 @@ export class PatronEditor {
 	handleMouseDown(opt) {
 		const tool = this.state.activeTool;
 		if (tool === 'select' || tool === 'pan') {
-			// In select mode, check if clicking an endpoint to resume
-			this._checkEndpointClick(opt);
 			return;
 		}
 
@@ -387,8 +487,6 @@ export class PatronEditor {
 		switch (tool) {
 			case 'line': this.handleLineClick(point, opt.e); break;
 			case 'curve': this.handleCurveClick(point, opt.e); break;
-			case 'arc': this.handleArcClick(point, opt.e); break;
-			case 'rect': this.handleRectStart(point, opt.e); break;
 		}
 	}
 
@@ -410,16 +508,11 @@ export class PatronEditor {
 		switch (tool) {
 			case 'line': this.updateLinePreview(point, opt.e); break;
 			case 'curve': this.updateCurvePreview(point, opt.e); break;
-			case 'arc': this.updateArcPreview(point); break;
-			case 'rect': this.updateRectPreview(point, opt.e); break;
 		}
 	}
 
 	handleMouseUp(opt) {
 		const tool = this.state.activeTool;
-		if (tool === 'rect' && this.rectStart) {
-			this.handleRectEnd(opt);
-		}
 	}
 
 	// ============================================================
@@ -519,10 +612,11 @@ export class PatronEditor {
 	// Add a segment + point to the active contour
 	// ============================================================
 	_addSegment(point, segmentObj) {
+		// During drawing, endpoints are not draggable (avoid accidental drags)
 		if (this.activeDirection === 'end') {
-			this.activeContour.addPointEnd(point, segmentObj);
+			this.activeContour.addPointEnd(point, segmentObj, false);
 		} else {
-			this.activeContour.addPointStart(point, segmentObj);
+			this.activeContour.addPointStart(point, segmentObj, false);
 		}
 	}
 
@@ -530,7 +624,7 @@ export class PatronEditor {
 	// Check if a click should close or merge
 	// Returns true if handled (closed/merged), false otherwise
 	// ============================================================
-	_tryCloseOrMerge(point) {
+	_tryCloseOrMerge(point, closingSegmentMeta = null) {
 		const zoom = this.canvas.getZoom();
 		const threshold = CLOSE_THRESHOLD / zoom;
 
@@ -540,7 +634,7 @@ export class PatronEditor {
 		const oppositeIdx = this.activeDirection === 'end' ? 0 : this.activeContour.points.length - 1;
 		const oppositePoint = this.activeContour.points[oppositeIdx];
 		if (this.activeContour.points.length >= 3 && dist(point, oppositePoint) < threshold) {
-			this._closeContour(this.activeContour);
+			this._closeContour(this.activeContour, closingSegmentMeta);
 			return true;
 		}
 
@@ -574,7 +668,7 @@ export class PatronEditor {
 				this.activeContour = new OpenContour(this.canvas, this.state);
 				this.activeDirection = 'end';
 				this.contours.push(this.activeContour);
-				this.activeContour.addPointEnd(point, null);
+				this.activeContour.addPointEnd(point, null, false);
 				document.getElementById('status-info').textContent =
 					'Tracez le contour. Échap pour mettre en pause. Rejoignez le point de départ pour fermer.';
 			}
@@ -638,7 +732,7 @@ export class PatronEditor {
 					this.activeContour = new OpenContour(this.canvas, this.state);
 					this.activeDirection = 'end';
 					this.contours.push(this.activeContour);
-					this.activeContour.addPointEnd(point, null);
+					this.activeContour.addPointEnd(point, null, false);
 				}
 			}
 			this.curveStart = this._currentTip();
@@ -655,8 +749,8 @@ export class PatronEditor {
 			const start = this.curveStart;
 			const end = this.curveEnd;
 
-			// Check close/merge with the end point
-			if (this._tryCloseOrMerge(end)) {
+			// Check close/merge with the end point — pass curve metadata so closing segment stays a curve
+			if (this._tryCloseOrMerge(end, { type: 'Q', cp: { x: cp.x, y: cp.y } })) {
 				this._cleanupTempObjects();
 				this.curveState = 'idle';
 				return;
@@ -721,140 +815,9 @@ export class PatronEditor {
 	}
 
 	// ============================================================
-	// ARC TOOL (3-point arc)
-	// ============================================================
-	handleArcClick(point, event) {
-		if (this.arcPoints.length === 0) {
-			if (!this.activeContour) {
-				const resumed = this._tryResumeAtPoint(point);
-				if (!resumed) {
-					this.activeContour = new OpenContour(this.canvas, this.state);
-					this.activeDirection = 'end';
-					this.contours.push(this.activeContour);
-					this.activeContour.addPointEnd(point, null);
-				}
-			}
-			// Use current tip as arc start
-			this.arcPoints.push(this._currentTip());
-			document.getElementById('status-info').textContent = 'Arc : cliquez un point sur l\'arc (2/3)';
-		}
-
-		if (this.arcPoints.length < 3) {
-			this.arcPoints.push(point);
-			const marker = new fabric.Circle({
-				left: point.x - 4 / this.canvas.getZoom(), top: point.y - 4 / this.canvas.getZoom(),
-				radius: 4 / this.canvas.getZoom(), fill: '#e74c3c', stroke: '#fff',
-				strokeWidth: 1 / this.canvas.getZoom(), selectable: false, evented: false,
-			});
-			this.canvas.add(marker);
-			this.tempArcMarkers.push(marker);
-		}
-
-		if (this.arcPoints.length === 2) {
-			document.getElementById('status-info').textContent = 'Arc : cliquez le point final (3/3)';
-		} else if (this.arcPoints.length === 3) {
-			const [p1, p2, p3] = this.arcPoints;
-			const cp = {
-				x: 2 * p2.x - 0.5 * p1.x - 0.5 * p3.x,
-				y: 2 * p2.y - 0.5 * p1.y - 0.5 * p3.y,
-			};
-
-			// Check close/merge
-			if (this._tryCloseOrMerge(p3)) {
-				this._cleanupTempObjects();
-				this.arcPoints = [];
-				return;
-			}
-
-			const pathStr = `M ${p1.x} ${p1.y} Q ${cp.x} ${cp.y} ${p3.x} ${p3.y}`;
-			const arcPath = new fabric.Path(pathStr, {
-				fill: '', stroke: '#333', strokeWidth: 2 / this.canvas.getZoom(),
-				selectable: false, evented: false, _isPathSegment: true, _contourId: this.activeContour.id,
-			});
-
-			this._addSegment(p3, arcPath);
-			this._cleanupTempObjects();
-			this.arcPoints = [];
-			this._updateStatusInfo();
-			this.canvas.renderAll();
-		}
-	}
-
-	updateArcPreview(point) {
-		if (this.arcPoints.length > 0 && this.arcPoints.length < 3) {
-			if (this.tempLine) this.canvas.remove(this.tempLine);
-			const lastPoint = this.arcPoints[this.arcPoints.length - 1];
-			this.tempLine = new fabric.Line(
-				[lastPoint.x, lastPoint.y, point.x, point.y],
-				{ stroke: '#999', strokeWidth: 1.5 / this.canvas.getZoom(), strokeDashArray: [6, 4], selectable: false, evented: false }
-			);
-			this.canvas.add(this.tempLine);
-
-			if (this.arcPoints.length === 2) {
-				if (this.tempCurve) this.canvas.remove(this.tempCurve);
-				const [p1, p2] = this.arcPoints;
-				const p3 = point;
-				const cp = { x: 2 * p2.x - 0.5 * p1.x - 0.5 * p3.x, y: 2 * p2.y - 0.5 * p1.y - 0.5 * p3.y };
-				const pathStr = `M ${p1.x} ${p1.y} Q ${cp.x} ${cp.y} ${p3.x} ${p3.y}`;
-				this.tempCurve = new fabric.Path(pathStr, {
-					fill: '', stroke: '#999', strokeWidth: 1.5 / this.canvas.getZoom(), strokeDashArray: [6, 4], selectable: false, evented: false,
-				});
-				this.canvas.add(this.tempCurve);
-			}
-			this.canvas.renderAll();
-		}
-	}
-
-	// ============================================================
-	// RECTANGLE TOOL (creates patron directly)
-	// ============================================================
-	handleRectStart(point, event) {
-		this.rectStart = point;
-		this.tempRect = new fabric.Rect({
-			left: point.x, top: point.y, width: 0, height: 0,
-			fill: 'rgba(51, 51, 51, 0.05)', stroke: '#333',
-			strokeWidth: 2 / this.canvas.getZoom(), selectable: false, evented: false,
-		});
-		this.canvas.add(this.tempRect);
-	}
-
-	updateRectPreview(point, event) {
-		if (!this.rectStart || !this.tempRect) return;
-		let width = point.x - this.rectStart.x;
-		let height = point.y - this.rectStart.y;
-		if (event?.shiftKey) {
-			const size = Math.max(Math.abs(width), Math.abs(height));
-			width = Math.sign(width) * size;
-			height = Math.sign(height) * size;
-		}
-		this.tempRect.set({
-			left: width >= 0 ? this.rectStart.x : this.rectStart.x + width,
-			top: height >= 0 ? this.rectStart.y : this.rectStart.y + height,
-			width: Math.abs(width), height: Math.abs(height),
-		});
-		this.canvas.renderAll();
-	}
-
-	handleRectEnd(opt) {
-		if (!this.rectStart || !this.tempRect) return;
-		const width = this.tempRect.width;
-		const height = this.tempRect.height;
-		if (width < 5 && height < 5) {
-			this.canvas.remove(this.tempRect);
-			this.tempRect = null;
-			this.rectStart = null;
-			return;
-		}
-		this.canvas.remove(this.tempRect);
-		this._createPatronFromRect(this.tempRect.left, this.tempRect.top, width, height);
-		this.tempRect = null;
-		this.rectStart = null;
-	}
-
-	// ============================================================
 	// Close a contour → create patron
 	// ============================================================
-	_closeContour(contour) {
+	_closeContour(contour, closingSegmentMeta = null) {
 		// Build SVG path and extract segment metadata for later editing.
 		// The contour has N points and N-1 segments (the closing segment is implicit).
 		// We need to add the closing segment (last point → first point) to the metadata.
@@ -885,10 +848,22 @@ export class PatronEditor {
 		// This segment is represented by Z in SVG but needs an explicit entry in metadata
 		// so that edit mode knows about all N sides of the polygon.
 		if (segmentsMeta.length < vertices.length) {
-			segmentsMeta.push({ type: 'L' });
+			if (closingSegmentMeta) {
+				segmentsMeta.push(closingSegmentMeta);
+				if (closingSegmentMeta.type === 'Q' && closingSegmentMeta.cp) {
+					const cp = closingSegmentMeta.cp;
+					const first = vertices[0];
+					pathStr += ` Q ${cp.x} ${cp.y} ${first.x} ${first.y} Z`;
+				} else {
+					pathStr += ' Z';
+				}
+			} else {
+				segmentsMeta.push({ type: 'L' });
+				pathStr += ' Z';
+			}
+		} else {
+			pathStr += ' Z';
 		}
-
-		pathStr += ' Z';
 
 		// Remove contour objects from canvas
 		contour.removeFromCanvas();
@@ -941,16 +916,81 @@ export class PatronEditor {
 	}
 
 	// ============================================================
+	// Serialize / Deserialize open contours for JSON save/load
+	// ============================================================
+	serializeContours() {
+		return this.contours.map(c => ({
+			id: c.id,
+			points: c.points.map(p => ({ x: p.x, y: p.y })),
+			segments: c.segments.map(seg => {
+				if (seg.type === 'line') {
+					return { type: 'L' };
+				} else if (seg.type === 'path' && seg.path) {
+					let cp = null;
+					for (const cmd of seg.path) {
+						if (cmd[0] === 'Q') { cp = { x: cmd[1], y: cmd[2] }; break; }
+					}
+					return { type: 'Q', cp };
+				}
+				return { type: 'L' };
+			}),
+		}));
+	}
+
+	deserializeContours(contoursData) {
+		const zoom = this.canvas.getZoom();
+		for (const cd of contoursData) {
+			const contour = new OpenContour(this.canvas, this.state);
+			contour.id = cd.id;
+			this.contours.push(contour);
+
+			// Add first point (no segment)
+			if (cd.points.length > 0) {
+				contour.addPointEnd(cd.points[0], null, true);
+			}
+
+			// Add subsequent points with their segments
+			for (let i = 1; i < cd.points.length; i++) {
+				const from = cd.points[i - 1];
+				const to = cd.points[i];
+				const segMeta = cd.segments[i - 1];
+				let segObj;
+
+				if (segMeta && segMeta.type === 'Q' && segMeta.cp) {
+					const pathStr = `M ${from.x} ${from.y} Q ${segMeta.cp.x} ${segMeta.cp.y} ${to.x} ${to.y}`;
+					segObj = new fabric.Path(pathStr, {
+						fill: '', stroke: '#333', strokeWidth: 2 / zoom,
+						selectable: false, evented: false,
+						_isPathSegment: true, _contourId: contour.id,
+					});
+				} else {
+					segObj = new fabric.Line([from.x, from.y, to.x, to.y], {
+						stroke: '#333', strokeWidth: 2 / zoom,
+						selectable: false, evented: false,
+						_isPathSegment: true, _contourId: contour.id,
+					});
+				}
+
+				contour.addPointEnd(to, segObj, true);
+			}
+		}
+		this.canvas.renderAll();
+	}
+
+	// ============================================================
 	// Park drawing (Échap) — contour stays on canvas, user can resume later
 	// ============================================================
 	parkDrawing() {
 		this._cleanupTempObjects();
+		// Enable endpoint dragging on the parked contour (was disabled during drawing)
+		if (this.activeContour) {
+			this.activeContour._refreshEndpointStyles(true);
+		}
 		this.activeContour = null;
 		this.activeDirection = 'end';
 		this.curveState = 'idle';
 		this.curveStart = null;
 		this.curveEnd = null;
-		this.arcPoints = [];
 
 		document.getElementById('status-info').textContent =
 			this.contours.length > 0
@@ -974,9 +1014,6 @@ export class PatronEditor {
 		this.curveState = 'idle';
 		this.curveStart = null;
 		this.curveEnd = null;
-		this.arcPoints = [];
-		this.rectStart = null;
-		if (this.tempRect) { this.canvas.remove(this.tempRect); this.tempRect = null; }
 		if (this.calibrationLine) { this.canvas.remove(this.calibrationLine); this.calibrationLine = null; }
 		this.isCalibrating = false;
 		this.calibrationStart = null;
@@ -1019,8 +1056,8 @@ export class PatronEditor {
 		if (this.tempCurve) { this.canvas.remove(this.tempCurve); this.tempCurve = null; }
 		this.tempCurveHandles.forEach(h => this.canvas.remove(h));
 		this.tempCurveHandles = [];
-		this.tempArcMarkers.forEach(m => this.canvas.remove(m));
-		this.tempArcMarkers = [];
+		this.tempMarkers.forEach(m => this.canvas.remove(m));
+		this.tempMarkers = [];
 	}
 
 	_updateStatusInfo() {
@@ -1047,6 +1084,7 @@ export class PatronEditor {
 			transparentCorners: false, borderColor: '#4a90d9',
 		});
 		this.canvas.add(patronPath);
+		this._ensureStripsOnTop();
 		this.canvas.setActiveObject(patronPath);
 		setActiveTool('select');
 		saveHistoryState();
@@ -1055,42 +1093,12 @@ export class PatronEditor {
 		this.canvas.renderAll();
 	}
 
-	_createPatronFromRect(left, top, width, height) {
-		this.patronCount++;
-		const patronName = `Patron ${this.patronCount}`;
-
-		// Build as a Path (not Rect) so edit mode works uniformly
-		const vertices = [
-			{ x: left, y: top },
-			{ x: left + width, y: top },
-			{ x: left + width, y: top + height },
-			{ x: left, y: top + height },
-		];
-		const segmentsMeta = [
-			{ type: 'L' }, { type: 'L' }, { type: 'L' }, { type: 'L' },
-		];
-		const pathStr = `M ${left} ${top} L ${left + width} ${top} L ${left + width} ${top + height} L ${left} ${top + height} Z`;
-
-		const patronPath = new fabric.Path(pathStr, {
-			fill: 'rgba(100, 149, 237, 0.1)',
-			stroke: '#4a90d9',
-			strokeWidth: 2 / this.canvas.getZoom(),
-			selectable: true, evented: true,
-			_isPatron: true,
-			_patronId: 'patron_' + Date.now(),
-			_patronName: patronName,
-			_patronVertices: vertices,
-			_patronSegments: segmentsMeta,
-			cornerColor: '#4a90d9', cornerStyle: 'circle', cornerSize: 8,
-			transparentCorners: false, borderColor: '#4a90d9',
-		});
-		this.canvas.add(patronPath);
-		this.canvas.setActiveObject(patronPath);
-		setActiveTool('select');
-		saveHistoryState();
-		showToast(`${patronName} créé`);
-		if (window.atelierModules?.stats) window.atelierModules.stats.update();
-		this.canvas.renderAll();
+	// Ensure all strips (fur bands) are rendered above all patrons
+	_ensureStripsOnTop() {
+		const strips = this.canvas.getObjects().filter(o => o._isStrip);
+		for (const s of strips) {
+			this.canvas.bringToFront(s);
+		}
 	}
 
 	constrainAngle(from, to) {
@@ -1200,7 +1208,11 @@ export class PatronEditor {
 				const pathStr = `M ${from.x} ${from.y} Q ${sMeta.cp.x} ${sMeta.cp.y} ${to.x} ${to.y}`;
 				segObj = new fabric.Path(pathStr, {
 					fill: '', stroke: '#4a90d9', strokeWidth: 1.5 / zoom,
-					selectable: false, evented: false, _isEditSegment: true,
+					perPixelTargetFind: true,
+					selectable: true, evented: true,
+					hasBorders: false, hasControls: false, lockMovementX: true, lockMovementY: true,
+					_isEditSegment: true, _patronIndex: patronIdx, _segmentIndex: i,
+					hoverCursor: 'pointer',
 				});
 				cpHandle = new fabric.Circle({
 					left: sMeta.cp.x, top: sMeta.cp.y,
@@ -1227,7 +1239,11 @@ export class PatronEditor {
 			} else {
 				segObj = new fabric.Line([from.x, from.y, to.x, to.y], {
 					stroke: '#4a90d9', strokeWidth: 1.5 / zoom,
-					selectable: false, evented: false, _isEditSegment: true,
+					perPixelTargetFind: true,
+					selectable: true, evented: true,
+					hasBorders: false, hasControls: false, lockMovementX: true, lockMovementY: true,
+					_isEditSegment: true, _patronIndex: patronIdx, _segmentIndex: i,
+					hoverCursor: 'pointer',
 				});
 				const lengthCm = dist(from, to) / this.state.pxPerCm;
 				const lPos = labelPosition(from, to, offset);
@@ -1261,7 +1277,8 @@ export class PatronEditor {
 
 	exitEditMode() {
 		if (!this.editMode.active) return;
-		this._mergeSource = null;
+		this._mergeSnapTarget = null;
+		this._mergeSnapSource = null;
 
 		const em = this.editMode;
 
@@ -1314,6 +1331,8 @@ export class PatronEditor {
 			this.canvas.add(newPatron);
 		}
 
+		this._ensureStripsOnTop();
+
 		// Reset edit state
 		this.editMode = {
 			active: false,
@@ -1345,6 +1364,10 @@ export class PatronEditor {
 			this._updateEditSegmentQuiet(record, (vIdx - 1 + n) % n);
 			this._updateEditSegmentQuiet(record, vIdx);
 			this._bringEditHandlesToFront();
+
+			// Snap detection: check proximity to vertices of OTHER patrons
+			this._updateMergeSnapTarget(pIdx, vIdx, target.left, target.top);
+
 			this.canvas.requestRenderAll();
 		}
 
@@ -1361,6 +1384,161 @@ export class PatronEditor {
 		}
 	}
 
+	// Detect proximity to a vertex of another patron during drag (for merge snap)
+	_updateMergeSnapTarget(dragPIdx, dragVIdx, x, y) {
+		const zoom = this.canvas.getZoom();
+		const threshold = CLOSE_THRESHOLD / zoom;
+		let found = null;
+
+		for (let pIdx = 0; pIdx < this.editMode.patrons.length; pIdx++) {
+			if (pIdx === dragPIdx) continue; // skip same patron
+			const record = this.editMode.patrons[pIdx];
+			for (let vIdx = 0; vIdx < record.vertices.length; vIdx++) {
+				const v = record.vertices[vIdx];
+				if (dist({ x, y }, v) < threshold) {
+					found = { patronIndex: pIdx, vertexIndex: vIdx };
+					break;
+				}
+			}
+			if (found) break;
+		}
+
+		// Update highlight
+		const prev = this._mergeSnapTarget;
+		if (prev && (!found || prev.patronIndex !== found.patronIndex || prev.vertexIndex !== found.vertexIndex)) {
+			// Un-highlight previous target
+			const prevRecord = this.editMode.patrons[prev.patronIndex];
+			if (prevRecord && prevRecord.handles[prev.vertexIndex]) {
+				prevRecord.handles[prev.vertexIndex].set({ fill: '#4a90d9', radius: 6 / zoom });
+			}
+		}
+		if (found) {
+			// Highlight new target in green
+			const targetRecord = this.editMode.patrons[found.patronIndex];
+			if (targetRecord && targetRecord.handles[found.vertexIndex]) {
+				targetRecord.handles[found.vertexIndex].set({ fill: '#2ecc71', radius: 9 / zoom });
+			}
+		}
+
+		this._mergeSnapTarget = found; // { patronIndex, vertexIndex } or null
+		this._mergeSnapSource = found ? { patronIndex: dragPIdx, vertexIndex: dragVIdx } : null;
+	}
+
+	// Called on mouse:up after dragging a vertex — if snap target exists, merge the two patrons
+	handleEditModeDropMerge() {
+		if (!this._mergeSnapTarget || !this._mergeSnapSource) return false;
+
+		const src = this._mergeSnapSource;
+		const dst = this._mergeSnapTarget;
+
+		// Clear snap state and highlight
+		const zoom = this.canvas.getZoom();
+		const dstRecord = this.editMode.patrons[dst.patronIndex];
+		if (dstRecord && dstRecord.handles[dst.vertexIndex]) {
+			dstRecord.handles[dst.vertexIndex].set({ fill: '#4a90d9', radius: 6 / zoom });
+		}
+		this._mergeSnapTarget = null;
+		this._mergeSnapSource = null;
+
+		// Perform merge
+		this.mergeEditPatrons(src.patronIndex, src.vertexIndex, dst.patronIndex, dst.vertexIndex);
+		return true;
+	}
+
+	// ============================================================
+	// ENDPOINT DRAG — drag an open contour endpoint to move it or merge with another
+	// ============================================================
+
+	// Called on every object:moving for an _isEndpointAnchor target
+	handleEndpointDrag(target) {
+		const contourId = target._contourId;
+		const contour = this.contours.find(c => c.id === contourId);
+		if (!contour) return;
+
+		// Determine which endpoint (0 = start, last = end)
+		const isStart = (target._endpointIndex === 0);
+		const endpointIdx = isStart ? 0 : contour.points.length - 1;
+
+		// Update contour geometry
+		contour.updateEndpointPosition(endpointIdx, target.left, target.top);
+
+		// Snap detection: check proximity to endpoints of OTHER contours
+		this._updateContourSnapTarget(contour, endpointIdx, target.left, target.top);
+
+		this.canvas.requestRenderAll();
+	}
+
+	// Detect proximity to an endpoint of another contour during drag
+	_updateContourSnapTarget(dragContour, dragEndpointIdx, x, y) {
+		const zoom = this.canvas.getZoom();
+		const threshold = CLOSE_THRESHOLD / zoom;
+		let found = null;
+
+		for (const contour of this.contours) {
+			if (contour === dragContour) continue;
+			if (contour.points.length === 0) continue;
+
+			// Check start point
+			if (dist({ x, y }, contour.startPoint) < threshold) {
+				found = { contour, endpointIndex: 0 };
+				break;
+			}
+			// Check end point
+			if (dist({ x, y }, contour.endPoint) < threshold) {
+				found = { contour, endpointIndex: contour.points.length - 1 };
+				break;
+			}
+		}
+
+		// Update highlight
+		const prev = this._contourSnapTarget;
+		if (prev && (!found || prev.contour !== found.contour || prev.endpointIndex !== found.endpointIndex)) {
+			// Un-highlight previous target
+			prev.contour.highlightEndpoint(prev.endpointIndex, false);
+		}
+		if (found) {
+			found.contour.highlightEndpoint(found.endpointIndex, true);
+		}
+
+		this._contourSnapTarget = found; // { contour, endpointIndex } or null
+		this._contourSnapSource = found ? { contour: dragContour, endpointIndex: dragEndpointIdx } : null;
+	}
+
+	// Called on mouse:up after dragging an endpoint — if snap target exists, merge the two contours
+	handleEndpointDropMerge() {
+		if (!this._contourSnapTarget || !this._contourSnapSource) return false;
+
+		const src = this._contourSnapSource;
+		const dst = this._contourSnapTarget;
+
+		// Clear snap state and highlight
+		dst.contour.highlightEndpoint(dst.endpointIndex, false);
+		this._contourSnapTarget = null;
+		this._contourSnapSource = null;
+
+		// Determine directions for merge:
+		// src.endpointIndex: 0 = we're dragging the start, last = we're dragging the end
+		// dst.endpointIndex: 0 = target is the start, last = target is the end
+		const srcDir = src.endpointIndex === 0 ? 'start' : 'end';
+		const dstEnd = dst.endpointIndex === 0 ? 'start' : 'end';
+
+		// Discard the dragged anchor (it may become an interior point after merge)
+		this.canvas.discardActiveObject();
+
+		// Use the existing _mergeContours which handles direction normalization
+		// _mergeContours may auto-close if endpoints meet → creates a patron
+		this._mergeContours(src.contour, srcDir, dst.contour, dstEnd);
+
+		// Park the result so the user stays in select mode.
+		// If _mergeContours auto-closed the contour into a patron, activeContour is null
+		// and _createPatronFromPath already showed a toast — don't show a second one.
+		if (this.activeContour) {
+			this.parkDrawing();
+			showToast('Contours fusionnés');
+		}
+		return true;
+	}
+
 	// Update a segment's fabric objects without triggering render (caller renders)
 	_updateEditSegmentQuiet(record, segIdx) {
 		const n = record.vertices.length;
@@ -1369,6 +1547,7 @@ export class PatronEditor {
 		const seg = record.segments[segIdx];
 		const zoom = this.canvas.getZoom();
 		const offset = 12 / zoom;
+		const pIdx = this.editMode.patrons.indexOf(record);
 
 		this.canvas.remove(seg.obj);
 		this.canvas.remove(seg.label);
@@ -1379,7 +1558,11 @@ export class PatronEditor {
 			const pathStr = `M ${from.x} ${from.y} Q ${seg.cp.x} ${seg.cp.y} ${to.x} ${to.y}`;
 			newObj = new fabric.Path(pathStr, {
 				fill: '', stroke: '#4a90d9', strokeWidth: 1.5 / zoom,
-				selectable: false, evented: false, _isEditSegment: true,
+				perPixelTargetFind: true,
+				selectable: true, evented: true,
+				hasBorders: false, hasControls: false, lockMovementX: true, lockMovementY: true,
+				_isEditSegment: true, _patronIndex: pIdx, _segmentIndex: segIdx,
+				hoverCursor: 'pointer',
 			});
 			lengthCm = bezierLength(from, seg.cp, to) / this.state.pxPerCm;
 			const mid = bezierMidpoint(from, seg.cp, to);
@@ -1389,7 +1572,11 @@ export class PatronEditor {
 		} else {
 			newObj = new fabric.Line([from.x, from.y, to.x, to.y], {
 				stroke: '#4a90d9', strokeWidth: 1.5 / zoom,
-				selectable: false, evented: false, _isEditSegment: true,
+				perPixelTargetFind: true,
+				selectable: true, evented: true,
+				hasBorders: false, hasControls: false, lockMovementX: true, lockMovementY: true,
+				_isEditSegment: true, _patronIndex: pIdx, _segmentIndex: segIdx,
+				hoverCursor: 'pointer',
 			});
 			lengthCm = dist(from, to) / this.state.pxPerCm;
 			lPos = labelPosition(from, to, offset);
@@ -1405,8 +1592,7 @@ export class PatronEditor {
 	// Merge two patrons in edit mode by connecting a vertex from each.
 	// pIdx1/vIdx1 — the "seam" vertex on the first patron.
 	// pIdx2/vIdx2 — the "seam" vertex on the second patron.
-	// NOTE: No UI trigger is wired yet. This method is ready for use once
-	// a "merge vertices" interaction (e.g. drag-snap or toolbar button) is added.
+	// Triggered by drag-snap: user drags a vertex onto another patron's vertex.
 	mergeEditPatrons(pIdx1, vIdx1, pIdx2, vIdx2) {
 		const em = this.editMode;
 		const r1 = em.patrons[pIdx1];
@@ -1449,7 +1635,10 @@ export class PatronEditor {
 		const to2 = r2.vertices[0];
 		const connectObj1 = new fabric.Line([from1.x, from1.y, to2.x, to2.y], {
 			stroke: '#4a90d9', strokeWidth: 1.5 / zoom,
-			selectable: false, evented: false, _isEditSegment: true,
+			perPixelTargetFind: true,
+			selectable: true, evented: true,
+			hasBorders: false, hasControls: false, lockMovementX: true, lockMovementY: true,
+			_isEditSegment: true, _patronIndex: pIdx1, _segmentIndex: -1, hoverCursor: 'pointer',
 		});
 		const connectLen1 = dist(from1, to2) / this.state.pxPerCm;
 		const connectLPos1 = labelPosition(from1, to2, offset);
@@ -1469,7 +1658,10 @@ export class PatronEditor {
 		const toFirst = r1.vertices[0];
 		const closeObj = new fabric.Line([fromLast.x, fromLast.y, toFirst.x, toFirst.y], {
 			stroke: '#4a90d9', strokeWidth: 1.5 / zoom,
-			selectable: false, evented: false, _isEditSegment: true,
+			perPixelTargetFind: true,
+			selectable: true, evented: true,
+			hasBorders: false, hasControls: false, lockMovementX: true, lockMovementY: true,
+			_isEditSegment: true, _patronIndex: pIdx1, _segmentIndex: -1, hoverCursor: 'pointer',
 		});
 		const closeLen = dist(fromLast, toFirst) / this.state.pxPerCm;
 		const closeLPos = labelPosition(fromLast, toFirst, offset);
@@ -1494,67 +1686,9 @@ export class PatronEditor {
 
 		const count = em.patrons.length;
 		showToast('Patrons fusionnés');
+		if (window.atelierModules?.stats) window.atelierModules.stats.update();
 		document.getElementById('status-info').textContent =
 			`Mode édition — ${count} patron${count > 1 ? 's' : ''}. Déplacez les points. Échap pour quitter.`;
-	}
-
-	// Start merge: user selected a source vertex, now waiting for target
-	startMerge(patronIndex, vertexIndex) {
-		this._mergeSource = { patronIndex, vertexIndex };
-		// Highlight the source vertex
-		const record = this.editMode.patrons[patronIndex];
-		if (record && record.handles[vertexIndex]) {
-			record.handles[vertexIndex].set({ fill: '#2ecc71', radius: 9 / this.canvas.getZoom() });
-			this.canvas.renderAll();
-		}
-		document.getElementById('status-info').textContent =
-			'Cliquez sur un point d\'un autre patron pour connecter les deux patrons.';
-	}
-
-	// Handle click during merge mode
-	handleMergeClick(target) {
-		if (!this._mergeSource) return false;
-		if (!target || !target._isEditVertex) {
-			// Cancel merge
-			this._cancelMerge();
-			return true;
-		}
-
-		const src = this._mergeSource;
-		const dstPIdx = target._patronIndex;
-		const dstVIdx = target._vertexIndex;
-
-		if (dstPIdx === src.patronIndex) {
-			showToast('Sélectionnez un point d\'un autre patron');
-			return true;
-		}
-
-		// Reset source highlight
-		this._resetMergeHighlight();
-		this._mergeSource = null;
-
-		// Perform merge
-		this.mergeEditPatrons(src.patronIndex, src.vertexIndex, dstPIdx, dstVIdx);
-		return true;
-	}
-
-	_cancelMerge() {
-		this._resetMergeHighlight();
-		this._mergeSource = null;
-		document.getElementById('status-info').textContent =
-			'Mode édition — Déplacez les points. Échap pour quitter.';
-	}
-
-	_resetMergeHighlight() {
-		if (!this._mergeSource) return;
-		const record = this.editMode.patrons[this._mergeSource.patronIndex];
-		if (record && record.handles[this._mergeSource.vertexIndex]) {
-			const zoom = this.canvas.getZoom();
-			record.handles[this._mergeSource.vertexIndex].set({
-				fill: '#4a90d9', radius: 6 / zoom,
-			});
-			this.canvas.renderAll();
-		}
 	}
 
 	// Delete a vertex in edit mode
@@ -1602,9 +1736,14 @@ export class PatronEditor {
 		const zoom = this.canvas.getZoom();
 		const offset = 12 / zoom;
 
+		const pIdx = this.editMode.patrons.indexOf(record);
 		const newObj = new fabric.Line([from.x, from.y, to.x, to.y], {
 			stroke: '#4a90d9', strokeWidth: 1.5 / zoom,
-			selectable: false, evented: false, _isEditSegment: true,
+			perPixelTargetFind: true,
+			selectable: true, evented: true,
+			hasBorders: false, hasControls: false, lockMovementX: true, lockMovementY: true,
+			_isEditSegment: true, _patronIndex: pIdx, _segmentIndex: insertIdx,
+			hoverCursor: 'pointer',
 		});
 		const lengthCm = dist(from, to) / this.state.pxPerCm;
 		const lPos = labelPosition(from, to, offset);
@@ -1621,6 +1760,116 @@ export class PatronEditor {
 		this._rebuildEditHandleLookups();
 		this._bringEditHandlesToFront();
 		this.canvas.renderAll();
+	}
+
+	// Delete a segment in edit mode — opens the patron into an OpenContour.
+	// The deleted segment is removed, leaving an open shape (N vertices, N-1 segments).
+	deleteEditSegment(patronIndex, segmentIndex) {
+		const record = this.editMode.patrons[patronIndex];
+		if (!record) return;
+
+		// Minimum: need at least 2 segments to have a meaningful open shape after deletion
+		if (record.segments.length <= 1) {
+			showToast('Impossible de supprimer le dernier segment');
+			return;
+		}
+
+		// Rotate the record so the deleted segment is the last one (the "closing" segment).
+		// After rotation, vertices[0..n-1] and segments[0..n-2] form the open contour,
+		// and segments[n-1] (the one we're deleting) is the closing edge.
+		const newStartIdx = (segmentIndex + 1) % record.vertices.length;
+		this._rotateRecord(record, newStartIdx);
+		// Now the segment to delete is the last one in the array
+		const delIdx = record.segments.length - 1;
+
+		// Convert this edit record into an OpenContour
+		this._convertEditRecordToContour(record, delIdx);
+
+		// Remove the patron record from edit mode
+		this.canvas.discardActiveObject();
+		this.editMode.patrons.splice(patronIndex, 1);
+
+		// If no more patrons in edit mode, exit edit mode entirely
+		if (this.editMode.patrons.length === 0) {
+			this.editMode.active = false;
+			this.editMode._allHandles = [];
+			this.editMode._allCPHandles = [];
+			this.canvas.renderAll();
+			document.getElementById('status-info').textContent = '';
+		} else {
+			// Re-index remaining patrons
+			this._reindexAllHandles();
+			this._rebuildEditHandleLookups();
+			this._bringEditHandlesToFront();
+			this.canvas.renderAll();
+			const count = this.editMode.patrons.length;
+			document.getElementById('status-info').textContent =
+				`Mode édition — ${count} patron${count > 1 ? 's' : ''}. Déplacez les points. Échap pour quitter.`;
+		}
+
+		showToast('Segment supprimé — le patron est maintenant un contour ouvert');
+		if (window.atelierModules?.stats) window.atelierModules.stats.update();
+	}
+
+	// Convert an edit mode patron record into an OpenContour.
+	// Removes all edit objects from canvas, creates OpenContour fabric objects.
+	// delSegIdx = index of the segment to NOT include (the one being deleted).
+	_convertEditRecordToContour(record, delSegIdx) {
+		const zoom = this.canvas.getZoom();
+
+		// 1. Remove ALL edit mode objects from canvas
+		record.handles.forEach(h => this.canvas.remove(h));
+		record.cpHandles.forEach(h => this.canvas.remove(h));
+		record.segments.forEach(s => {
+			this.canvas.remove(s.obj);
+			this.canvas.remove(s.label);
+		});
+
+		// 2. Create a new OpenContour
+		const contour = new OpenContour(this.canvas, this.state);
+
+		// 3. Add the first point (no segment for the first point)
+		contour.addPointEnd(record.vertices[0], null);
+
+		// 4. Add remaining points with their segments (skip the deleted segment)
+		for (let i = 0; i < record.segments.length; i++) {
+			if (i === delSegIdx) continue; // skip the deleted segment
+
+			const from = record.vertices[i];
+			const to = record.vertices[(i + 1) % record.vertices.length];
+			const sMeta = record.segments[i];
+			let segObj;
+
+			if (sMeta.type === 'Q' && sMeta.cp) {
+				const pathStr = `M ${from.x} ${from.y} Q ${sMeta.cp.x} ${sMeta.cp.y} ${to.x} ${to.y}`;
+				segObj = new fabric.Path(pathStr, {
+					stroke: '#333',
+					strokeWidth: 2 / zoom,
+					fill: '',
+					selectable: false,
+					evented: false,
+					_isPathSegment: true,
+					_contourId: contour.id,
+				});
+			} else {
+				segObj = new fabric.Line([from.x, from.y, to.x, to.y], {
+					stroke: '#333',
+					strokeWidth: 2 / zoom,
+					selectable: false,
+					evented: false,
+					_isPathSegment: true,
+					_contourId: contour.id,
+				});
+			}
+
+			contour.addPointEnd(to, segObj);
+		}
+
+		// 5. Register the contour
+		this.contours.push(contour);
+
+		// The patron's original fabric.Path was already removed from canvas
+		// when entering edit mode, so no need to remove it again.
 	}
 
 	// ---- Edit mode helpers ----
@@ -1647,6 +1896,9 @@ export class PatronEditor {
 				h._patronIndex = pIdx;
 			});
 			record.segments.forEach((s, sIdx) => {
+				// Update indices on the segment fabric object itself
+				s.obj._patronIndex = pIdx;
+				s.obj._segmentIndex = sIdx;
 				if (s.cpHandle) s.cpHandle._segmentIndex = sIdx;
 			});
 		});
@@ -1777,7 +2029,7 @@ export class PatronEditor {
 				selectable: false, evented: false,
 			});
 			this.canvas.add(marker);
-			this.tempArcMarkers.push(marker);
+			this.tempMarkers.push(marker);
 			document.getElementById('status-info').textContent = 'Cliquez sur le deuxième point';
 		} else {
 			const dx = point.x - this.calibrationStart.x;
@@ -1790,8 +2042,8 @@ export class PatronEditor {
 				drawGrid();
 				showToast(`Échelle calibrée : 1 cm = ${Math.round(newPxPerCm)} pixels`);
 			}
-			this.tempArcMarkers.forEach(m => this.canvas.remove(m));
-			this.tempArcMarkers = [];
+			this.tempMarkers.forEach(m => this.canvas.remove(m));
+			this.tempMarkers = [];
 			if (this.calibrationLine) { this.canvas.remove(this.calibrationLine); this.calibrationLine = null; }
 			this.isCalibrating = false;
 			this.calibrationStart = null;

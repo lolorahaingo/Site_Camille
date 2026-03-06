@@ -84,6 +84,8 @@ function initCanvas() {
 	state.canvas.on('selection:cleared', handleSelectionCleared);
 	state.canvas.on('object:modified', handleObjectModified);
 	state.canvas.on('object:moving', handleObjectMoving);
+	state.canvas.on('object:scaling', handleObjectTransforming);
+	state.canvas.on('object:rotating', handleObjectTransforming);
 
 	// Set initial cursor
 	updateCanvasCursor();
@@ -334,16 +336,9 @@ function handleMouseDown(opt) {
 		return;
 	}
 
-	// Merge mode: intercept click to pick target vertex
-	const pe = window.atelierModules?.patronEditor;
-	if (pe && pe._mergeSource) {
-		const target = state.canvas.findTarget(opt.e);
-		if (pe.handleMergeClick(target)) return;
-	}
-
 	// Delegate to active tool module
-	if (pe) {
-		pe.handleMouseDown(opt);
+	if (window.atelierModules?.patronEditor) {
+		window.atelierModules.patronEditor.handleMouseDown(opt);
 	}
 }
 
@@ -382,14 +377,31 @@ function handleMouseUp(opt) {
 		return;
 	}
 
-	// Delegate to active tool module
-	if (window.atelierModules?.patronEditor) {
-		window.atelierModules.patronEditor.handleMouseUp(opt);
+	const pe = window.atelierModules?.patronEditor;
+	if (pe) {
+		// Edit mode: check if a vertex was dropped on another patron's vertex (drag-snap merge)
+		if (pe.editMode.active) {
+			pe.handleEditModeDropMerge();
+		}
+		// Open contour: check if an endpoint was dropped on another endpoint (drag-snap merge)
+		pe.handleEndpointDropMerge();
+
+		// Delegate to active tool module
+		pe.handleMouseUp(opt);
 	}
 }
 
 function handleSelectionChange(opt) {
 	updatePropertiesPanel(opt.selected);
+
+	// Highlight selected edit segment (orange), reset previous
+	_resetSegmentHighlight();
+	if (opt.selected && opt.selected.length === 1 && opt.selected[0]._isEditSegment) {
+		const seg = opt.selected[0];
+		seg.set({ stroke: '#e67e22' });
+		state._highlightedSegment = seg;
+		state.canvas.renderAll();
+	}
 
 	// Show dimension labels on selected patron
 	const pe = window.atelierModules?.patronEditor;
@@ -406,8 +418,18 @@ function handleSelectionChange(opt) {
 	}
 }
 
+function _resetSegmentHighlight() {
+	if (state._highlightedSegment) {
+		state._highlightedSegment.set({ stroke: '#4a90d9' });
+		state._highlightedSegment = null;
+	}
+}
+
 function handleSelectionCleared() {
 	clearPropertiesPanel();
+
+	// Reset segment highlight
+	_resetSegmentHighlight();
 
 	// Clear dimension labels (but don't exit edit mode — that's done via Escape or double-click)
 	const pe = window.atelierModules?.patronEditor;
@@ -419,6 +441,14 @@ function handleSelectionCleared() {
 function handleObjectModified(opt) {
 	saveHistoryState();
 	updateStats();
+
+	// Refresh dimension labels after any transform (move/scale/rotate)
+	if (opt.target && opt.target._isPatron) {
+		const pe = window.atelierModules?.patronEditor;
+		if (pe && !pe.editMode.active && pe._selectionLabels.length > 0) {
+			pe.showSelectionLabels(opt.target);
+		}
+	}
 
 	if (window.atelierModules?.placementEngine) {
 		window.atelierModules.placementEngine.handleObjectModified(opt);
@@ -434,9 +464,39 @@ function handleObjectMoving(opt) {
 		return;
 	}
 
+	// Open contour: handle endpoint dragging (move + snap detection)
+	if (opt.target && opt.target._isEndpointAnchor) {
+		if (window.atelierModules?.patronEditor) {
+			window.atelierModules.patronEditor.handleEndpointDrag(opt.target);
+		}
+		return;
+	}
+
+	// Update dimension labels when dragging a patron
+	if (opt.target && opt.target._isPatron) {
+		const pe = window.atelierModules?.patronEditor;
+		if (pe && !pe.editMode.active && pe._selectionLabels.length > 0) {
+			pe.showSelectionLabels(opt.target);
+		}
+	}
+
 	if (window.atelierModules?.placementEngine) {
 		window.atelierModules.placementEngine.handleObjectMoving(opt);
 	}
+
+	updateStats();
+}
+
+function handleObjectTransforming(opt) {
+	// Update dimension labels during scaling/rotation of a patron
+	if (opt.target && opt.target._isPatron) {
+		const pe = window.atelierModules?.patronEditor;
+		if (pe && !pe.editMode.active && pe._selectionLabels.length > 0) {
+			pe.showSelectionLabels(opt.target);
+		}
+	}
+
+	updateStats();
 }
 
 function handleMouseDblClick(opt) {
@@ -473,16 +533,11 @@ function handleContextMenu(opt) {
 
 	if (target && target._isEditVertex) {
 		// Edit mode: right-click on a vertex
-		const pe = window.atelierModules?.patronEditor;
-		const multiPatron = pe && pe.editMode.patrons.length > 1;
-		let items = '';
-		if (multiPatron) {
-			items += `<div class="context-menu__item" data-action="merge-patrons" data-patron-index="${target._patronIndex}" data-vertex-index="${target._vertexIndex}">Connecter à un autre patron</div>
-			<div class="context-menu__divider"></div>`;
-		}
-		items += `<div class="context-menu__item context-menu__item--danger" data-action="delete-vertex" data-patron-index="${target._patronIndex}" data-vertex-index="${target._vertexIndex}">Supprimer le point <span class="context-menu__shortcut">Suppr</span></div>`;
-		menu.innerHTML = items;
-	} else if (target && !target._isGrid && !target._isEditSegment && !target._isEditCP) {
+		menu.innerHTML = `<div class="context-menu__item context-menu__item--danger" data-action="delete-vertex" data-patron-index="${target._patronIndex}" data-vertex-index="${target._vertexIndex}">Supprimer le point <span class="context-menu__shortcut">Suppr</span></div>`;
+	} else if (target && target._isEditSegment) {
+		// Edit mode: right-click on a segment
+		menu.innerHTML = `<div class="context-menu__item context-menu__item--danger" data-action="delete-segment" data-patron-index="${target._patronIndex}" data-segment-index="${target._segmentIndex}">Supprimer le segment <span class="context-menu__shortcut">Suppr</span></div>`;
+	} else if (target && !target._isGrid && !target._isEditCP) {
 		menu.innerHTML = `
 			<div class="context-menu__item" data-action="duplicate">Dupliquer <span class="context-menu__shortcut">Ctrl+D</span></div>
 			<div class="context-menu__item" data-action="bring-front">Mettre devant</div>
@@ -508,17 +563,17 @@ function handleContextMenu(opt) {
 		const item = ev.target.closest('[data-action]');
 		if (!item) return;
 		const action = item.dataset.action;
-		if (action === 'merge-patrons') {
-			const pIdx = parseInt(item.dataset.patronIndex, 10);
-			const vIdx = parseInt(item.dataset.vertexIndex, 10);
-			if (window.atelierModules?.patronEditor) {
-				window.atelierModules.patronEditor.startMerge(pIdx, vIdx);
-			}
-		} else if (action === 'delete-vertex') {
+		if (action === 'delete-vertex') {
 			const pIdx = parseInt(item.dataset.patronIndex, 10);
 			const vIdx = parseInt(item.dataset.vertexIndex, 10);
 			if (window.atelierModules?.patronEditor) {
 				window.atelierModules.patronEditor.deleteEditVertex(pIdx, vIdx);
+			}
+		} else if (action === 'delete-segment') {
+			const pIdx = parseInt(item.dataset.patronIndex, 10);
+			const sIdx = parseInt(item.dataset.segmentIndex, 10);
+			if (window.atelierModules?.patronEditor) {
+				window.atelierModules.patronEditor.deleteEditSegment(pIdx, sIdx);
 			}
 		} else if (action) {
 			handleContextAction(action, target);
@@ -590,12 +645,23 @@ function setActiveTool(tool) {
 	state.canvas.selection = (tool === 'select');
 	state.canvas.forEachObject(obj => {
 		// These objects are NEVER user-selectable
-		if (obj._isGrid || obj._isBackground || obj._isDimensionLabel ||
-			obj._isEditSegment || obj._isAnchor || obj._isPathSegment) {
+		if (obj._isGrid || obj._isDimensionLabel ||
+			obj._isPathSegment) {
 			return;
 		}
-		// Edit handles are selectable only in select mode
-		if (obj._isEditVertex || obj._isEditCP) {
+		// Background image: selectable only when unlocked AND in select mode
+		if (obj._isBackground) {
+			const locked = document.getElementById('image-lock')?.checked ?? true;
+			obj.selectable = (!locked && tool === 'select');
+			obj.evented = (!locked && tool === 'select');
+			return;
+		}
+		// Interior anchors are never selectable; endpoint anchors are selectable in select mode
+		if (obj._isAnchor && !obj._isEndpointAnchor) {
+			return;
+		}
+		// Edit mode objects (vertices, segments, CP handles) are selectable in select mode
+		if (obj._isEditVertex || obj._isEditCP || obj._isEditSegment) {
 			obj.selectable = (tool === 'select');
 			obj.evented = (tool === 'select');
 		} else {
@@ -655,6 +721,7 @@ function redo() {
 function loadHistoryState(index) {
 	const json = JSON.parse(state.history[index]);
 	state.canvas.loadFromJSON(json, () => {
+		restoreObjectsAfterLoad();
 		drawGrid();
 		state.canvas.renderAll();
 		updateUndoRedoButtons();
@@ -887,6 +954,26 @@ function deleteSelection() {
 	const active = state.canvas.getActiveObject();
 	if (!active) return;
 
+	// Endpoint anchor selected → delete the entire open contour
+	if (active._isEndpointAnchor && active._contourId) {
+		const pe = window.atelierModules?.patronEditor;
+		if (pe) {
+			const contour = pe.contours.find(c => c.id === active._contourId);
+			if (contour) {
+				contour.removeFromCanvas();
+				pe.contours = pe.contours.filter(c => c !== contour);
+				if (pe.activeContour === contour) {
+					pe.activeContour = null;
+				}
+			}
+		}
+		state.canvas.discardActiveObject();
+		state.canvas.renderAll();
+		saveHistoryState();
+		updateStats();
+		return;
+	}
+
 	// Never delete internal objects through this path
 	const isProtected = obj =>
 		obj._isGrid || obj._isBackground || obj._isDimensionLabel ||
@@ -942,6 +1029,44 @@ function selectAll() {
 }
 
 // ============================================================
+// Restore object properties after loadFromJSON
+// Fabric.js doesn't serialize visual/interaction properties like
+// cornerColor, selectable, etc. — we must reapply them.
+// ============================================================
+function restoreObjectsAfterLoad() {
+	state.canvas.forEachObject(obj => {
+		if (obj._isPatron) {
+			obj.set({
+				selectable: true, evented: true,
+				cornerColor: '#4a90d9', cornerStyle: 'circle', cornerSize: 8,
+				transparentCorners: false, borderColor: '#4a90d9',
+			});
+			obj.setCoords();
+		}
+		if (obj._isStrip) {
+			const color = obj._stripData?.color || obj.stroke || '#888';
+			obj.set({
+				selectable: true, evented: true,
+				cornerColor: color, cornerStyle: 'circle', cornerSize: 7,
+				transparentCorners: false, borderColor: color,
+				hasRotatingPoint: true, rotatingPointOffset: 20,
+			});
+			obj.setCoords();
+		}
+		if (obj._isGrid || obj._isDimensionLabel || obj._isPathSegment) {
+			obj.set({ selectable: false, evented: false });
+		}
+		if (obj._isBackground) {
+			const locked = document.getElementById('image-lock')?.checked ?? true;
+			obj.set({ selectable: !locked, evented: !locked });
+		}
+	});
+
+	// Strips always on top of patrons
+	state.canvas.getObjects().filter(o => o._isStrip).forEach(s => state.canvas.bringToFront(s));
+}
+
+// ============================================================
 // Save / Load / Export
 // ============================================================
 function saveProject() {
@@ -956,6 +1081,7 @@ function saveProject() {
 	const projects = JSON.parse(localStorage.getItem('atelier_projects') || '{}');
 	projects[name] = data;
 	localStorage.setItem('atelier_projects', JSON.stringify(projects));
+	localStorage.setItem('atelier_active_project', name);
 
 	showToast('Projet sauvegardé');
 }
@@ -965,6 +1091,8 @@ function loadProject(name) {
 	const data = projects[name];
 	if (!data) return;
 
+	localStorage.setItem('atelier_active_project', name);
+
 	state.canvas.loadFromJSON(data.canvas, () => {
 		state.projectName = data.name;
 		state.zoom = data.zoom || 1;
@@ -972,10 +1100,11 @@ function loadProject(name) {
 
 		document.querySelector('.app-header__project-name').textContent = data.name;
 
+		restoreObjectsAfterLoad();
+
 		drawGrid();
 		drawRulers();
-		updateZoomDisplay();
-		state.canvas.renderAll();
+		zoomToFit();
 
 		// Reset history
 		state.history = [];
@@ -1039,6 +1168,8 @@ function refreshProjectList() {
 function newProject() {
 	if (!confirm('Créer un nouveau projet ? Les modifications non sauvegardées seront perdues.')) return;
 
+	localStorage.removeItem('atelier_active_project');
+
 	state.canvas.clear();
 	state.canvas.backgroundColor = CANVAS_BG;
 	state.projectName = 'Nouveau projet';
@@ -1058,6 +1189,104 @@ function newProject() {
 	updateZoomDisplay();
 	saveHistoryState();
 	state.canvas.renderAll();
+}
+
+function downloadProjectJSON() {
+	const pe = window.atelierModules?.patronEditor;
+
+	const data = {
+		name: state.projectName,
+		date: new Date().toISOString(),
+		version: 1,
+		pxPerCm: state.pxPerCm,
+		zoom: state.zoom,
+		viewportTransform: [...state.canvas.viewportTransform],
+		canvas: state.canvas.toJSON([
+			'_isGrid', '_isBackground', '_isPatron', '_isStrip',
+			'_patronId', '_patronName', '_patronVertices', '_patronSegments',
+			'_stripData', 'excludeFromExport',
+		]),
+		contours: pe ? pe.serializeContours() : [],
+	};
+
+	const json = JSON.stringify(data, null, 2);
+	const blob = new Blob([json], { type: 'application/json' });
+	const url = URL.createObjectURL(blob);
+
+	const link = document.createElement('a');
+	link.download = `${state.projectName}.json`;
+	link.href = url;
+	link.click();
+	URL.revokeObjectURL(url);
+
+	showToast('Projet téléchargé');
+}
+
+function importProjectJSON(file) {
+	const reader = new FileReader();
+	reader.onload = (e) => {
+		try {
+			const data = JSON.parse(e.target.result);
+
+			if (!data.canvas) {
+				showToast('Fichier invalide : pas de données canvas');
+				return;
+			}
+
+			// Clear current state
+			const pe = window.atelierModules?.patronEditor;
+			if (pe) {
+				// Park any active drawing and clear contours
+				pe.parkDrawing();
+				pe.contours.forEach(c => c.removeFromCanvas());
+				pe.contours = [];
+				if (pe.editMode.active) pe.exitEditMode();
+			}
+
+			state.canvas.loadFromJSON(data.canvas, () => {
+				state.projectName = data.name || 'Projet importé';
+				state.pxPerCm = data.pxPerCm || BASE_PX_PER_CM;
+				state.zoom = data.zoom || 1;
+				state.canvas.setZoom(state.zoom);
+
+				if (data.viewportTransform) {
+					state.canvas.viewportTransform = data.viewportTransform;
+				}
+
+				document.querySelector('.app-header__project-name').textContent = state.projectName;
+
+				// Restore background image reference
+				state.backgroundImage = null;
+				state.canvas.forEachObject(obj => {
+					if (obj._isBackground) {
+						state.backgroundImage = obj;
+					}
+				});
+
+				// Restore open contours if saved
+				if (pe && data.contours && data.contours.length > 0) {
+					pe.deserializeContours(data.contours);
+				}
+
+				restoreObjectsAfterLoad();
+
+				drawGrid();
+				drawRulers();
+				zoomToFit();
+
+				// Reset history
+				state.history = [];
+				state.historyIndex = -1;
+				saveHistoryState();
+
+				showToast('Projet importé');
+			});
+		} catch (err) {
+			console.error('Import error:', err);
+			showToast('Erreur lors de l\'import du fichier');
+		}
+	};
+	reader.readAsText(file);
 }
 
 function exportPNG() {
@@ -1144,9 +1373,7 @@ function initKeyboardShortcuts() {
 				case 'v': setActiveTool('select'); break;
 				case 'l': setActiveTool('line'); break;
 				case 'c': setActiveTool('curve'); break;
-				case 'a': setActiveTool('arc'); break;
-				case 'r': setActiveTool('rect'); break;
-			}
+				}
 		}
 
 		// Ctrl shortcuts
@@ -1181,6 +1408,8 @@ function initKeyboardShortcuts() {
 				const active = state.canvas.getActiveObject();
 				if (active && active._isEditVertex) {
 					pe.deleteEditVertex(active._patronIndex, active._vertexIndex);
+				} else if (active && active._isEditSegment) {
+					pe.deleteEditSegment(active._patronIndex, active._segmentIndex);
 				}
 				return;
 			}
@@ -1197,9 +1426,7 @@ function initKeyboardShortcuts() {
 			e.preventDefault();
 			if (window.atelierModules?.patronEditor) {
 				const pe = window.atelierModules.patronEditor;
-				if (pe._mergeSource) {
-					pe._cancelMerge();
-				} else if (pe.editMode?.active) {
+				if (pe.editMode?.active) {
 					pe.exitEditMode();
 				} else {
 					pe.parkDrawing();
@@ -1243,6 +1470,16 @@ function initToolbar() {
 	document.getElementById('btn-new').addEventListener('click', newProject);
 	document.getElementById('btn-save').addEventListener('click', saveProject);
 	document.getElementById('btn-export').addEventListener('click', exportPNG);
+	document.getElementById('btn-download-json').addEventListener('click', downloadProjectJSON);
+	document.getElementById('btn-import-json').addEventListener('click', () => {
+		document.getElementById('json-input').click();
+	});
+	document.getElementById('json-input').addEventListener('change', (e) => {
+		const file = e.target.files[0];
+		if (!file) return;
+		importProjectJSON(file);
+		e.target.value = ''; // Reset so same file can be re-selected
+	});
 	document.getElementById('btn-undo').addEventListener('click', undo);
 	document.getElementById('btn-redo').addEventListener('click', redo);
 
@@ -1272,10 +1509,14 @@ function initToolbar() {
 	document.getElementById('image-lock').addEventListener('change', (e) => {
 		if (state.backgroundImage) {
 			const locked = e.target.checked;
+			const inSelectMode = state.activeTool === 'select';
 			state.backgroundImage.set({
-				selectable: !locked,
-				evented: !locked,
+				selectable: !locked && inSelectMode,
+				evented: !locked && inSelectMode,
 			});
+			if (locked) {
+				state.canvas.discardActiveObject();
+			}
 			state.canvas.renderAll();
 		}
 	});
@@ -1330,6 +1571,14 @@ function importBackgroundImage(file) {
 				evented: false,
 				_isBackground: true,
 				excludeFromExport: false,
+				// Resize controls: lock aspect ratio, allow corner scaling
+				lockUniScaling: true,
+				cornerColor: '#4a90d9',
+				cornerStrokeColor: '#fff',
+				cornerSize: 10,
+				transparentCorners: false,
+				borderColor: '#4a90d9',
+				borderDashArray: [4, 4],
 			});
 
 			state.backgroundImage = img;
@@ -1403,8 +1652,19 @@ function init() {
 		console.warn('Stats module not loaded:', e.message);
 	}
 
-	// Save initial state
-	saveHistoryState();
+	// Restore last active project, or save initial state
+	const activeProject = localStorage.getItem('atelier_active_project');
+	if (activeProject) {
+		const projects = JSON.parse(localStorage.getItem('atelier_projects') || '{}');
+		if (projects[activeProject]) {
+			loadProject(activeProject);
+		} else {
+			localStorage.removeItem('atelier_active_project');
+			saveHistoryState();
+		}
+	} else {
+		saveHistoryState();
+	}
 
 	// Auto-save
 	initAutoSave();
