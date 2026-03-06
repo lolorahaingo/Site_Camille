@@ -23,7 +23,7 @@ const state = {
 	zoom: 1,
 	activeTool: 'select',
 	gridVisible: true,
-	snapEnabled: false,
+
 	isPanning: false,
 	panStart: null,
 	spaceHeld: false,
@@ -1453,12 +1453,6 @@ function initToolbar() {
 	// Tool buttons
 	document.querySelectorAll('.toolbar__btn[data-tool]').forEach(btn => {
 		btn.addEventListener('click', () => setActiveTool(btn.dataset.tool));
-	});
-
-	// Snap toggle
-	document.getElementById('btn-toggle-snap').addEventListener('click', () => {
-		state.snapEnabled = !state.snapEnabled;
-		document.getElementById('btn-toggle-snap').classList.toggle('toggled', state.snapEnabled);
 	});
 
 	// Zoom buttons

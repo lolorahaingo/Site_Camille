@@ -1,5 +1,5 @@
 // ============================================================
-// PlacementEngine — Strip placement, snapping, and validation
+// PlacementEngine — Strip placement and validation
 // ============================================================
 
 import { updateStats } from '../atelier.js';
@@ -8,7 +8,6 @@ export class PlacementEngine {
 	constructor(canvas, state) {
 		this.canvas = canvas;
 		this.state = state;
-		this.snapThreshold = 6; // pixels - magnetic snap distance
 	}
 	
 	// ============================================================
@@ -17,11 +16,6 @@ export class PlacementEngine {
 	handleObjectMoving(opt) {
 		const obj = opt.target;
 		if (!obj || !obj._isStrip) return;
-		
-		// Magnetic snapping to other strips
-		if (this.state.snapEnabled) {
-			this.snapToNearbyStrips(obj);
-		}
 		
 		// Check if strip is inside any patron
 		this.validateStripPlacement(obj);
@@ -43,88 +37,6 @@ export class PlacementEngine {
 	
 	handleSelectionChange(opt) {
 		// Could highlight the patron that contains the selected strip
-	}
-	
-	// ============================================================
-	// Magnetic Snapping
-	// ============================================================
-	snapToNearbyStrips(movingStrip) {
-		const strips = this.canvas.getObjects().filter(o => 
-			o._isStrip && o !== movingStrip
-		);
-		
-		if (strips.length === 0) return;
-		
-		const movingBounds = this.getRotatedBounds(movingStrip);
-		let snappedX = false;
-		let snappedY = false;
-		
-		for (const strip of strips) {
-			const targetBounds = this.getRotatedBounds(strip);
-			
-			// Check horizontal snapping (left/right edges)
-			// Moving strip's right edge to target's left edge
-			const rightToLeft = Math.abs(movingBounds.right - targetBounds.left);
-			if (rightToLeft < this.snapThreshold && !snappedX) {
-				movingStrip.set('left', movingStrip.left - (movingBounds.right - targetBounds.left));
-				snappedX = true;
-			}
-			
-			// Moving strip's left edge to target's right edge
-			const leftToRight = Math.abs(movingBounds.left - targetBounds.right);
-			if (leftToRight < this.snapThreshold && !snappedX) {
-				movingStrip.set('left', movingStrip.left + (targetBounds.right - movingBounds.left));
-				snappedX = true;
-			}
-			
-			// Moving strip's left edge to target's left edge (alignment)
-			const leftToLeft = Math.abs(movingBounds.left - targetBounds.left);
-			if (leftToLeft < this.snapThreshold && !snappedX) {
-				movingStrip.set('left', movingStrip.left + (targetBounds.left - movingBounds.left));
-				snappedX = true;
-			}
-			
-			// Check vertical snapping (top/bottom edges)
-			// Moving strip's bottom edge to target's top edge
-			const bottomToTop = Math.abs(movingBounds.bottom - targetBounds.top);
-			if (bottomToTop < this.snapThreshold && !snappedY) {
-				movingStrip.set('top', movingStrip.top - (movingBounds.bottom - targetBounds.top));
-				snappedY = true;
-			}
-			
-			// Moving strip's top edge to target's bottom edge
-			const topToBottom = Math.abs(movingBounds.top - targetBounds.bottom);
-			if (topToBottom < this.snapThreshold && !snappedY) {
-				movingStrip.set('top', movingStrip.top + (targetBounds.bottom - movingBounds.top));
-				snappedY = true;
-			}
-			
-			// Moving strip's top edge to target's top edge (alignment)
-			const topToTop = Math.abs(movingBounds.top - targetBounds.top);
-			if (topToTop < this.snapThreshold && !snappedY) {
-				movingStrip.set('top', movingStrip.top + (targetBounds.top - movingBounds.top));
-				snappedY = true;
-			}
-			
-			if (snappedX && snappedY) break;
-		}
-		
-		// Also snap to grid if enabled
-		if (this.state.snapEnabled) {
-			const gridSize = this.state.pxPerCm; // 1cm grid
-			if (!snappedX) {
-				const snappedLeft = Math.round(movingStrip.left / gridSize) * gridSize;
-				if (Math.abs(snappedLeft - movingStrip.left) < this.snapThreshold) {
-					movingStrip.set('left', snappedLeft);
-				}
-			}
-			if (!snappedY) {
-				const snappedTop = Math.round(movingStrip.top / gridSize) * gridSize;
-				if (Math.abs(snappedTop - movingStrip.top) < this.snapThreshold) {
-					movingStrip.set('top', snappedTop);
-				}
-			}
-		}
 	}
 	
 	// ============================================================

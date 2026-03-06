@@ -476,8 +476,7 @@ export class PatronEditor {
 			return;
 		}
 
-		const pointer = this.canvas.getPointer(opt.e);
-		const point = this.snapPoint(pointer);
+		const point = this.canvas.getPointer(opt.e);
 
 		if (this.isCalibrating) {
 			this.handleCalibrationClick(point);
@@ -492,8 +491,7 @@ export class PatronEditor {
 
 	handleMouseMove(opt) {
 		const tool = this.state.activeTool;
-		const pointer = this.canvas.getPointer(opt.e);
-		const point = this.snapPoint(pointer);
+		const point = this.canvas.getPointer(opt.e);
 
 		// Always check endpoint hover (for visual feedback)
 		this._updateEndpointHover(point);
@@ -555,8 +553,7 @@ export class PatronEditor {
 	}
 
 	_checkEndpointClick(opt) {
-		const pointer = this.canvas.getPointer(opt.e);
-		const point = this.snapPoint(pointer);
+		const point = this.canvas.getPointer(opt.e);
 		const zoom = this.canvas.getZoom();
 		const threshold = CLOSE_THRESHOLD / zoom;
 
@@ -584,18 +581,6 @@ export class PatronEditor {
 		const ptCount = contour.points.length;
 		document.getElementById('status-info').textContent =
 			`Tracé repris (${ptCount} points). Continuez à tracer ou rejoignez le point opposé pour fermer.`;
-	}
-
-	// ============================================================
-	// Snap
-	// ============================================================
-	snapPoint(point) {
-		if (!this.state.snapEnabled) return { x: point.x, y: point.y };
-		const gridSize = this.state.pxPerCm;
-		return {
-			x: Math.round(point.x / gridSize) * gridSize,
-			y: Math.round(point.y / gridSize) * gridSize,
-		};
 	}
 
 	// ============================================================
