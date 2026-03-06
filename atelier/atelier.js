@@ -817,6 +817,38 @@ function updatePropertiesPanel(objects) {
 		return;
 	}
 
+	// Multi-selection: show count and summary
+	if (objects.length > 1) {
+		const editVerts = objects.filter(o => o._isEditVertex).length;
+		const editSegs = objects.filter(o => o._isEditSegment).length;
+		const anchors = objects.filter(o => o._isAnchor).length;
+		const patrons = objects.filter(o => o._isPatron).length;
+		const strips = objects.filter(o => o._isStrip).length;
+		const other = objects.length - editVerts - editSegs - anchors - patrons - strips;
+
+		let details = [];
+		if (editVerts > 0) details.push(`${editVerts} point${editVerts > 1 ? 's' : ''}`);
+		if (editSegs > 0) details.push(`${editSegs} segment${editSegs > 1 ? 's' : ''}`);
+		if (anchors > 0) details.push(`${anchors} point${anchors > 1 ? 's' : ''} de contour`);
+		if (patrons > 0) details.push(`${patrons} patron${patrons > 1 ? 's' : ''}`);
+		if (strips > 0) details.push(`${strips} bande${strips > 1 ? 's' : ''}`);
+		if (other > 0) details.push(`${other} autre${other > 1 ? 's' : ''}`);
+
+		content.innerHTML = `
+			<div class="panel__field">
+				<label>Sélection multiple</label>
+				<span style="font-size:0.85rem;font-weight:500;color:#111">${objects.length} éléments</span>
+			</div>
+			<div class="panel__field">
+				<span style="font-size:0.8rem;color:#666">${details.join(', ')}</span>
+			</div>
+			<div class="panel__field">
+				<p class="panel__hint" style="margin-top:4px">Suppr pour supprimer la sélection.</p>
+			</div>
+		`;
+		return;
+	}
+
 	const obj = objects[0];
 	const cmX = (obj.left / state.pxPerCm).toFixed(1);
 	const cmY = (obj.top / state.pxPerCm).toFixed(1);

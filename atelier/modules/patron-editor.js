@@ -171,7 +171,8 @@ class OpenContour {
 					_endpointIndex: i, // 0 = start, anchors.length-1 = end
 				});
 			} else {
-				// Interior anchors: not draggable, but respond to right-click
+				// Interior anchors: not draggable, selectable in select mode for deletion
+				const inSelectMode = this.state.activeTool === 'select';
 				a.set({
 					radius: r,
 					originX: 'left', originY: 'top',
@@ -180,8 +181,9 @@ class OpenContour {
 					fill: '#fff',
 					stroke: '#4a90d9',
 					strokeWidth: 1.5 / zoom,
-					selectable: false, evented: true,
+					selectable: inSelectMode, evented: true,
 					hasBorders: false, hasControls: false,
+					lockMovementX: true, lockMovementY: true,
 					hoverCursor: 'default',
 					_isEndpointAnchor: false,
 					_anchorIndex: i,
