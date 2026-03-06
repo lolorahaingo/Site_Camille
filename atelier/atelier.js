@@ -789,15 +789,100 @@ function updatePropertiesPanel(objects) {
 	const angle = (obj.angle || 0).toFixed(1);
 
 	let typeLabel = 'Objet';
-	if (obj._isPatron) typeLabel = 'Patron';
-	else if (obj._isStrip) typeLabel = 'Bande';
-	else if (obj._isBackground) typeLabel = 'Image de fond';
+	let subtypeLabel = '';
+	if (obj._isPatron) {
+		typeLabel = 'Patron';
+		subtypeLabel = obj._patronName || '';
+	} else if (obj._isStrip) {
+		typeLabel = 'Bande';
+		if (obj._stripData) {
+			subtypeLabel = `${obj._stripData.furType || ''} — ${obj._stripData.widthCm || '?'}×${obj._stripData.lengthCm || '?'} cm`;
+		}
+	} else if (obj._isBackground) {
+		typeLabel = 'Image de fond';
+	} else if (obj._isEditVertex) {
+		const pe = window.atelierModules?.patronEditor;
+		const record = pe?.editMode?.patrons?.[obj._patronIndex];
+		const patronName = record?.patronObj?._patronName || 'Patron';
+		typeLabel = 'Point';
+		subtypeLabel = `${patronName} — sommet ${(obj._vertexIndex ?? 0) + 1}`;
+	} else if (obj._isEditSegment) {
+		const pe = window.atelierModules?.patronEditor;
+		const record = pe?.editMode?.patrons?.[obj._patronIndex];
+		const patronName = record?.patronObj?._patronName || 'Patron';
+		const segType = record?.segments?.[obj._segmentIndex]?.type === 'Q' ? 'courbe' : 'ligne';
+		typeLabel = 'Segment';
+		subtypeLabel = `${patronName} — ${segType} ${(obj._segmentIndex ?? 0) + 1}`;
+	} else if (obj._isEditCP) {
+		const pe = window.atelierModules?.patronEditor;
+		const record = pe?.editMode?.patrons?.[obj._patronIndex];
+		const patronName = record?.patronObj?._patronName || 'Patron';
+		typeLabel = 'Point de contrôle';
+		subtypeLabel = `${patronName} — segment ${(obj._segmentIndex ?? 0) + 1}`;
+	}
+
+	// For edit mode objects, show contextual info instead of generic dimensions
+	if (obj._isEditVertex || obj._isEditSegment || obj._isEditCP) {
+		const ptX = (obj._isEditVertex || obj._isEditCP)
+			? (obj.left / state.pxPerCm).toFixed(1)
+			: '';
+		const ptY = (obj._isEditVertex || obj._isEditCP)
+			? (obj.top / state.pxPerCm).toFixed(1)
+			: '';
+
+		let editInfo = `
+			<div class="panel__field">
+				<label>Type</label>
+				<span style="font-size:0.85rem;font-weight:500;color:#111">${typeLabel}</span>
+			</div>`;
+		if (subtypeLabel) {
+			editInfo += `
+			<div class="panel__field">
+				<span style="font-size:0.8rem;color:#666">${subtypeLabel}</span>
+			</div>`;
+		}
+		if (ptX) {
+			editInfo += `
+			<div class="panel__field-row">
+				<div class="panel__field">
+					<label>X (cm)</label>
+					<span style="font-size:0.85rem">${ptX}</span>
+				</div>
+				<div class="panel__field">
+					<label>Y (cm)</label>
+					<span style="font-size:0.85rem">${ptY}</span>
+				</div>
+			</div>`;
+		}
+		if (obj._isEditSegment) {
+			const pe = window.atelierModules?.patronEditor;
+			const record = pe?.editMode?.patrons?.[obj._patronIndex];
+			if (record) {
+				const seg = record.segments[obj._segmentIndex];
+				if (seg?.label) {
+					editInfo += `
+			<div class="panel__field">
+				<label>Longueur</label>
+				<span style="font-size:0.85rem">${seg.label.text}</span>
+			</div>`;
+				}
+			}
+		}
+		editInfo += `
+			<div class="panel__field">
+				<p class="panel__hint" style="margin-top:4px">Suppr pour supprimer. Clic droit pour plus d'options.</p>
+			</div>`;
+
+		content.innerHTML = editInfo;
+		return;
+	}
 
 	content.innerHTML = `
 		<div class="panel__field">
 			<label>Type</label>
 			<span style="font-size:0.85rem;font-weight:500;color:#111">${typeLabel}</span>
 		</div>
+		${subtypeLabel ? `<div class="panel__field"><span style="font-size:0.8rem;color:#666">${subtypeLabel}</span></div>` : ''}
 		<div class="panel__field-row">
 			<div class="panel__field">
 				<label>X (cm)</label>
